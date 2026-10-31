@@ -464,6 +464,8 @@ body[data-view='home'] .site-header,
 }
 #app { min-height: 100svh; display: flex; flex-direction: column; }
 #main { flex: 1 0 auto; min-width: 0; }
+.catalog-layout [hidden], .catalog-layout > [hidden] { display: none !important; }
+.catalog-layout.without-filters { grid-template-columns: minmax(0,1fr); }
 .site-header { flex-shrink: 0; }
 .site-header { view-transition-name: site-navigation; }
 ::view-transition-group(site-navigation),

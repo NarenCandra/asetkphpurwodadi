@@ -20,7 +20,17 @@ Untuk demo lokal, `LOCAL_ADMIN_DEMO=true` membuka panel admin tanpa formulir log
 
 Alternatif: `npm.cmd run dev` di PowerShell atau `npm run dev` pada shell yang mengizinkan skrip npm. `--port 8001` dapat digunakan jika port 8000 sudah dipakai. Tidak memerlukan `npm install`.
 
-## Konfigurasi
+## Demo statis di Netlify
+
+`netlify.toml` di root repository menjalankan `node scripts/build-demo.cjs` dan memublikasikan folder `dist`. Konfigurasi ini menggantikan pengaturan manual sebelumnya yang memakai `public`. Build hanya membaca konten contoh di `demo/` dan aset frontend; tidak membaca `.env`, database, foto unggahan admin, atau kredensial.
+
+Demo menampilkan empat rumah publik contoh, filter, galeri, dan halaman kontak. URL langsung `/rumah/<id>`, `/tentang`, dan `/admin` diatur melalui rewrite. ID demo stabil antar-build. Panel admin menampilkan keterangan bahwa backend belum tersedia; perubahan data dan WhatsApp tidak diaktifkan pada demo. Website lokal yang dijalankan dengan `python app.py serve` tetap menggunakan API dan database asli.
+
+Untuk memperbarui demo: push perubahan ke GitHub lalu tunggu deploy Netlify selesai. Log harus menampilkan `Static demo built: 4 public houses` dan publish directory `dist`. Jika Netlify masih memakai konfigurasi lama, pilih base repository root (`/`), build command `node scripts/build-demo.cjs`, dan publish directory `dist`.
+
+Untuk mencoba hasil build lokal, jalankan `npm run build:demo`; folder `dist` adalah hasil build yang tidak perlu di-commit. Ini demo tampilan, bukan pengganti backend untuk pengelolaan properti nyata.
+
+## Konfigurasi aplikasi lokal
 
 Semua informasi pengelola di `.env`: `BUSINESS_NAME`, `BUSINESS_PROFILE`, `SERVICE_AREAS`, `SERVICE_HOURS`, `WHATSAPP_NUMBER`, `TIMEZONE`, `PORT`, `COOKIE_SECURE`. Mulai ulang server setelah perubahan.
 

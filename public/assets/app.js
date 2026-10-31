@@ -22,7 +22,26 @@ function glyph(name) {
   return `<svg class="glyph" aria-hidden="true" viewBox="0 0 24 24">${paths[name]||''}</svg>`;
 }
 
+let demoDataPromise;
 async function api(path, options={}) {
+  if (window.SEWARUMA_STATIC_DEMO) {
+    if (options.method && options.method !== 'GET') throw new Error('Perubahan data tidak tersedia pada demo.');
+    if (!demoDataPromise) {
+      demoDataPromise = fetch('/demo-data.json').then(response=>{
+        if (!response.ok) throw new Error('Data demonstrasi belum tersedia.');
+        return response.json();
+      }).catch(error=>{demoDataPromise=null;throw error;});
+    }
+    const demo = await demoDataPromise;
+    if (path==='/api/config') return demo.config;
+    if (path==='/api/houses') return demo.houses;
+    if (/^\/api\/houses\/[a-f0-9]+$/.test(path)) {
+      const house = demo.houses.find(h=>h.id===path.split('/').pop());
+      if (!house) throw new Error('Properti tidak tersedia');
+      return house;
+    }
+    throw new Error('Fitur ini membutuhkan backend aktif.');
+  }
   const response = await fetch(path, {...options, headers:{'Content-Type':'application/json',...(state.session.csrf ? {'X-CSRF-Token':state.session.csrf}:{}),...options.headers}});
   const data = await response.json();
   if (!response.ok) {
@@ -60,16 +79,18 @@ function whatsapp(house=null) {
   return `https://wa.me/${state.config.whatsapp}?text=${encodeURIComponent(message)}`;
 }
 function shell(content, title='Rumah sewa') {
+  // Keep the error page usable without treating failed configuration as loaded.
+  const businessName = state.config?.name || 'Sewaruma';
   cleanNavigation();
   cleanHero();
   cleanHero = () => {};
-  document.title = `${title} | ${state.config.name}`;
+  document.title = `${title} | ${businessName}`;
   const path = location.pathname;
   document.body.dataset.view = path.startsWith('/admin') ? 'admin' : path==='/' ? 'home' : 'public';
-  $('#app').innerHTML = `<header class="site-header"><div class="container header-inner"><a class="brand" href="/">${icon}<span class="header-logo-text">${esc(state.config.name)}</span></a><button class="menu-toggle" aria-expanded="false" aria-controls="nav">Menu</button><nav class="nav" id="nav" aria-label="Navigasi utama"><a href="/" ${path==='/'?'aria-current="page"':''}>Beranda</a><a href="/rumah" ${path.startsWith('/rumah')?'aria-current="page"':''}>Daftar Rumah</a><a href="/tentang" ${path==='/tentang'?'aria-current="page"':''}>Tentang & Kontak</a>${path.startsWith('/admin')?'<a href="/admin">Panel Admin</a>':''}</nav></div></header><main id="main" tabindex="-1">${content}</main><footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/">${icon}<span>${esc(state.config.name)}</span></a></div><div class="footer-links"><a href="/rumah">Daftar Rumah</a><a href="/tentang">Kontak</a><a href="/admin">Admin</a></div></div></footer>`;
-  if (state.config.name.toLowerCase()==='sewaruma') {
+  $('#app').innerHTML = `<header class="site-header"><div class="container header-inner"><a class="brand" href="/">${icon}<span class="header-logo-text">${esc(businessName)}</span></a><button class="menu-toggle" aria-expanded="false" aria-controls="nav">Menu</button><nav class="nav" id="nav" aria-label="Navigasi utama"><a href="/" ${path==='/'?'aria-current="page"':''}>Beranda</a><a href="/rumah" ${path.startsWith('/rumah')?'aria-current="page"':''}>Daftar Rumah</a><a href="/tentang" ${path==='/tentang'?'aria-current="page"':''}>Tentang & Kontak</a>${path.startsWith('/admin')?'<a href="/admin">Panel Admin</a>':''}</nav></div></header><main id="main" tabindex="-1">${content}</main><footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/">${icon}<span>${esc(businessName)}</span></a></div><div class="footer-links"><a href="/rumah">Daftar Rumah</a><a href="/tentang">Kontak</a><a href="/admin">Admin</a></div></div></footer>`;
+  if (businessName.toLowerCase()==='sewaruma') {
     $$('.brand').forEach(brand => {
-      brand.setAttribute('aria-label', state.config.name);
+      brand.setAttribute('aria-label', businessName);
       brand.lastElementChild.innerHTML = '<span class="brand-sewa">Sewa</span><span class="brand-ruma">ruma</span>';
     });
   }
@@ -188,6 +209,19 @@ function updateResults() {
   const f = state.filters;
   const [lower, upper] = priceBounds(f.period);
   const span = upper - lower;
+  const hasAreas = state.houses.some(h=>h.area);
+  const periods = ['monthly','yearly'].filter(period=>state.houses.some(h=>h[period]));
+  $('#area').closest('.field').hidden = !hasAreas;
+  $('#period').closest('.field').hidden = !periods.length;
+  for (const option of $('#period').options) {
+    if (option.value) option.hidden = !periods.includes(option.value);
+  }
+  $('.filter-fields').closest('.filter-box').hidden = !hasAreas && !periods.length;
+  $('#price-min').closest('.filter-box').hidden = !f.period || span<=0;
+  $('#sort').closest('label').hidden = !f.period || span<=0;
+  $('#reset-filters').hidden = !(f.area || f.period);
+  $('.filters').hidden = !hasAreas && !periods.length;
+  $('.catalog-layout').classList.toggle('without-filters', !hasAreas && !periods.length);
   const track = $('.range-track');
   track.classList.toggle('is-disabled', !f.period);
   track.style.setProperty('--range-left', `${span ? (f.min-lower)/span*100 : 0}%`);
@@ -339,6 +373,10 @@ async function route() {
   try {
     if(!state.config)state.config=await api('/api/config');
     if(path.startsWith('/admin')){
+      if(window.SEWARUMA_STATIC_DEMO) {
+        shell(`<div class="container section">${empty('Panel admin belum tersedia pada demo','Website ini menampilkan data contoh. Pengelolaan rumah memerlukan backend dan penyimpanan data aktif.','<a class="btn" href="/rumah">Lihat katalog demo</a>')}</div>`,'Demo Admin');
+        return;
+      }
       state.session=await api('/api/session');
       if(id!==navigationId)return;
       if(!state.session.authenticated)return login();

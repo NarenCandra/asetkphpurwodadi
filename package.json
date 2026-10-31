@@ -1,0 +1,13 @@
+{
+  "name": "sewaruma-local",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Katalog rumah sewa lokal dengan backend Python dan SQLite",
+  "scripts": {
+    "dev": "python app.py serve",
+    "start": "python app.py serve",
+    "build": "python scripts/check.py",
+    "lint": "python scripts/check.py",
+    "test": "python -m unittest discover -s tests -v"
+  }
+}

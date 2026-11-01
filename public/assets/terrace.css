@@ -388,6 +388,26 @@ body[data-view='home'] .site-header:not(.is-scrolled) .brand .brand-icon {
   .site-footer .brand.brand-organization .brand-icon { width: 48px; height: 48px; flex-basis: 48px; }
 }
 .contact-panel, .offer-panel, .form-section, .admin-section, .filter-box, .admin-filter { background: white; border-color: #dbe4d6; }
+/* Land contours and leaf forms frame the contact information. */
+body[data-page='about'] #main {
+  background-color: #f0f4ed;
+  background-image: url('/assets/contact-landscape.svg'), linear-gradient(130deg,#f0f4ed 25%,#e3ebdd 100%);
+  background-position: center top;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+body[data-page='about'] .contact-panel { background: #fffffff2; }
+body[data-page='about'] .contact-grid > section:first-child {
+  background: #f7faf4ed;
+  border-left: 3px solid #b2c7a0;
+  border-radius: 0 16px 16px 0;
+  padding: 28px 30px;
+  align-self: start;
+}
+@media (max-width:720px) {
+  body[data-page='about'] .contact-grid > section:first-child { padding: 23px 21px; }
+  body[data-page='about'] #main { background-size: auto 100%,cover; background-position: right top; }
+}
 .spec-grid, .offer { background: var(--wash); }
 .card-body h3, .page-head h1, .detail-layout h1 { color: var(--green-dark); }
 .card-bottom > a:hover { color: white; background: var(--green-dark); border-color: var(--green-dark); }
@@ -481,6 +501,32 @@ body[data-view='home'] .site-header,
 .edit-layout [hidden] { display: none !important; }
 .edit-layout [hidden] { display: none !important; }
 .catalog-layout.without-filters { grid-template-columns: minmax(0,1fr); }
+body[data-page='catalog'] .catalog-layout {
+  background: #fff;
+  border: 1px solid #dbe4d6;
+  border-radius: 20px;
+  padding: 28px;
+  margin-bottom: 48px;
+}
+body[data-page='catalog'] .catalog-layout > section { min-width: 0; }
+body[data-page='catalog'] .catalog-layout select {
+  appearance: none;
+  padding-left: 14px;
+  padding-right: 42px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%23315c41' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: 16px;
+  background-position: right 14px center;
+}
+@media (forced-colors:active) {
+  body[data-page='catalog'] .catalog-layout select { appearance: auto; background-image: none; padding-right: 14px; }
+}
+@media (max-width:1000px) {
+  body[data-page='catalog'] .catalog-layout { padding: 20px; gap: 24px; }
+}
+@media (max-width:720px) {
+  body[data-page='catalog'] .catalog-layout { padding: 16px; border-radius: 16px; gap: 20px; margin-bottom: 30px; }
+}
 .site-header { flex-shrink: 0; }
 .site-header { view-transition-name: site-navigation; }
 ::view-transition-group(site-navigation),

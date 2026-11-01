@@ -110,7 +110,7 @@ def house_record(db, row, admin=False):
     if admin:
         house['notice'] = lease_notice(house)
     else:
-        for key in ('lease_period', 'lease_start', 'lease_end', 'internal_notes'):
+        for key in ('lease_period', 'lease_start', 'lease_end', 'internal_notes', 'inventory_number', 'asset_condition', 'legal_basis', 'cooperation_type'):
             house.pop(key, None)
     return house
 
@@ -122,11 +122,13 @@ def validate_house(body, previous=None, photo_count=0):
     result['asset_type'] = body.get('asset_type', (previous or {}).get('asset_type', 'building'))
     if result['asset_type'] not in ('building', 'land'):
         raise ValueError('Jenis aset tidak valid.')
-    for key in ('name', 'code', 'description', 'area', 'address', 'maps_url', 'terms', 'extra_costs', 'internal_notes', 'lease_period', 'lease_start', 'lease_end', 'access', 'land_condition'):
+    for key in ('name', 'code', 'description', 'area', 'address', 'maps_url', 'terms', 'extra_costs', 'internal_notes', 'lease_period', 'lease_start', 'lease_end', 'access', 'land_condition', 'inventory_number', 'asset_condition', 'legal_basis', 'cooperation_type'):
         value = body.get(key, '')
         if not isinstance(value, str) or len(value) > 10000:
             raise ValueError('Isian teks tidak valid: ' + key)
         result[key] = value.strip()
+    if result['cooperation_type'] not in ('', 'Sewa 1 tahun', 'Sharing', 'Franchise'):
+        raise ValueError('Bentuk kerja tidak valid.')
     if not result['name'] or not result['code']:
         raise ValueError('Nama dan kode rumah wajib diisi.')
     if result['maps_url']:

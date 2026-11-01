@@ -14,6 +14,24 @@ import seed
 
 
 class RentalTests(unittest.TestCase):
+    def test_admin_inventory_fields_saved_and_private(self):
+        self.login()
+        house = self.draft()
+        house.update(inventory_number='INV-TEST-01', asset_condition='Baik', legal_basis='Dokumen uji', cooperation_type='Sharing')
+        status, _, _ = self.request('/api/admin/houses/'+house['id'], 'PUT', house, True)
+        self.assertEqual(status, 200)
+        _, saved, _ = self.request('/api/admin/houses/'+house['id'], auth=True)
+        self.assertEqual(saved['inventory_number'], 'INV-TEST-01')
+        self.assertEqual(saved['asset_condition'], 'Baik')
+        self.assertEqual(saved['legal_basis'], 'Dokumen uji')
+        self.assertEqual(saved['cooperation_type'], 'Sharing')
+        with app.connect() as db:
+            public = app.house_record(db, db.execute('SELECT * FROM houses WHERE id=?', (house['id'],)).fetchone())
+        for key in ('inventory_number','asset_condition','legal_basis','cooperation_type'):
+            self.assertNotIn(key, public)
+        with app.connect() as db:
+            db.execute('DELETE FROM houses WHERE id=?', (house['id'],))
+
     def test_asset_types_and_publication_requirements(self):
         building = {'name':'Bangunan uji','code':'ASSET-TYPE','status':'Tersedia',
                     'confirm_status':True,'area':'Kawasan uji','address':'Alamat uji',

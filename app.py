@@ -93,7 +93,7 @@ def lease_notice(house, current=None):
 def config():
     number = os.environ.get('WHATSAPP_NUMBER', '')
     return {
-        'name': os.environ.get('BUSINESS_NAME', 'Sewaruma'),
+        'name': os.environ.get('BUSINESS_NAME', 'Sewa Aset Perhutani KPH Purwodadi'),
         'profile': os.environ.get('BUSINESS_PROFILE', 'Profil pengelola belum diisi. Silakan lengkapi sebelum peluncuran.'),
         'areas': os.environ.get('SERVICE_AREAS', 'Kawasan layanan belum diisi'),
         'hours': os.environ.get('SERVICE_HOURS', 'Jam layanan belum diisi'),
@@ -119,7 +119,10 @@ def validate_house(body, previous=None, photo_count=0):
     if not isinstance(body, dict):
         raise ValueError('Data rumah tidak valid.')
     result = {}
-    for key in ('name', 'code', 'description', 'area', 'address', 'maps_url', 'terms', 'extra_costs', 'internal_notes', 'lease_period', 'lease_start', 'lease_end'):
+    result['asset_type'] = body.get('asset_type', (previous or {}).get('asset_type', 'building'))
+    if result['asset_type'] not in ('building', 'land'):
+        raise ValueError('Jenis aset tidak valid.')
+    for key in ('name', 'code', 'description', 'area', 'address', 'maps_url', 'terms', 'extra_costs', 'internal_notes', 'lease_period', 'lease_start', 'lease_end', 'access', 'land_condition'):
         value = body.get(key, '')
         if not isinstance(value, str) or len(value) > 10000:
             raise ValueError('Isian teks tidak valid: ' + key)
@@ -137,6 +140,8 @@ def validate_house(body, previous=None, photo_count=0):
         if key in ('bedrooms', 'bathrooms') and int(value) != value:
             raise ValueError('Jumlah kamar harus bilangan bulat.')
         result[key] = value
+    if result['asset_type'] == 'land':
+        result.update(building_size=0, bedrooms=0, bathrooms=0)
     amenities = body.get('amenities', [])
     if not isinstance(amenities, list) or len(amenities) > 50 or any(not isinstance(x, str) or len(x) > 150 for x in amenities):
         raise ValueError('Daftar fasilitas tidak valid.')
@@ -165,7 +170,8 @@ def validate_house(body, previous=None, photo_count=0):
             raise ValueError('Konfirmasi perubahan status diperlukan.')
     result['status'] = status
     if status != 'Draft':
-        if any(not result[k] for k in ('area', 'address', 'description', 'maps_url')) or any(result[k] <= 0 for k in ('land_size', 'building_size', 'bedrooms', 'bathrooms')) or photo_count < 1 or not (result['monthly'] or result['yearly']):
+        required_sizes = ('land_size', 'building_size') if result['asset_type'] == 'building' else ('land_size',)
+        if any(not result[k] for k in ('area', 'address', 'description', 'maps_url')) or any(result[k] <= 0 for k in required_sizes) or photo_count < 1 or not (result['monthly'] or result['yearly']):
             raise ValueError('Lengkapi lokasi, deskripsi, Google Maps, spesifikasi, minimal satu foto dan satu penawaran sebelum publikasi.')
     if status == 'Tersewa':
         period = result['lease_period']
@@ -181,7 +187,7 @@ def validate_house(body, previous=None, photo_count=0):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = 'Sewaruma'
+    server_version = 'Sewa Aset Perhutani KPH Purwodadi'
 
     def log_message(self, fmt, *args):
         # Avoid logging credentials and URL query strings.

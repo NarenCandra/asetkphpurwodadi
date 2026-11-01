@@ -14,6 +14,25 @@ import seed
 
 
 class RentalTests(unittest.TestCase):
+    def test_asset_types_and_publication_requirements(self):
+        building = {'name':'Bangunan uji','code':'ASSET-TYPE','status':'Tersedia',
+                    'confirm_status':True,'area':'Kawasan uji','address':'Alamat uji',
+                    'description':'Data uji','maps_url':'https://www.google.com/maps',
+                    'land_size':150,'building_size':80,'bedrooms':0,'bathrooms':0,
+                    'monthly':{'price':1000000,'minimum':1}}
+        self.assertEqual(app.validate_house(building, photo_count=1)['asset_type'], 'building')
+        land = dict(building, asset_type='land', building_size=0,
+                    access='Jalan lingkungan', land_condition='Lahan datar')
+        result = app.validate_house(land, photo_count=1)
+        self.assertEqual(result['building_size'], 0)
+        self.assertEqual(result['access'], 'Jalan lingkungan')
+        with self.assertRaises(ValueError):
+            app.validate_house(dict(building, asset_type='invalid'), photo_count=1)
+        with self.assertRaises(ValueError):
+            app.validate_house(dict(building, building_size=0), photo_count=1)
+        with self.assertRaises(ValueError):
+            app.validate_house(dict(land, land_size=0), photo_count=1)
+
     @classmethod
     def setUpClass(cls):
         cls.temp = tempfile.TemporaryDirectory()

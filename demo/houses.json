@@ -1,9 +1,200 @@
 [
-  {"code":"DEMO-001","name":"Rumah Taman Teduh","area":"Kawasan Taman (contoh)","address":"Alamat demonstrasi 01, bukan alamat properti sebenarnya.","maps_url":"https://www.google.com/maps","description":"Contoh rumah dengan ruang keluarga yang terhubung ke teras dan taman kecil. Seluruh informasi, lokasi, harga, dan foto hanya digunakan untuk demonstrasi aplikasi.","land_size":120,"building_size":90,"bedrooms":3,"bathrooms":2,"amenities":["Carport","Teras","Taman","Dapur"],"monthly":{"price":3500000,"minimum":3},"yearly":{"price":38000000,"minimum":1},"terms":"Contoh: penggunaan rumah dan ketentuan pemeliharaan dibahas saat survei.","extra_costs":"Contoh: listrik dan air mengikuti pemakaian.","status":"Tersedia"},
-  {"code":"DEMO-002","name":"Rumah Sudut Hijau","area":"Kawasan Selatan (contoh)","address":"Alamat demonstrasi 02, bukan alamat properti sebenarnya.","maps_url":"https://www.google.com/maps","description":"Contoh rumah sudut dengan pencahayaan alami dan area luar. Data ini bukan informasi properti nyata.","land_size":150,"building_size":110,"bedrooms":3,"bathrooms":2,"amenities":["Carport","Taman samping","Dapur","Ruang keluarga"],"monthly":null,"yearly":{"price":52000000,"minimum":1},"terms":"Survei dan kesepakatan langsung dengan pengelola.","extra_costs":"Konfirmasikan biaya lingkungan kepada pengelola.","status":"Tersedia"},
-  {"code":"DEMO-003","name":"Rumah Teras Asri","area":"Kawasan Taman (contoh)","address":"Alamat demonstrasi 03, bukan alamat properti sebenarnya.","maps_url":"https://www.google.com/maps","description":"Contoh rumah ringkas dengan dua kamar tidur dan teras depan. Seluruh data merupakan contoh untuk mencoba katalog.","land_size":90,"building_size":65,"bedrooms":2,"bathrooms":1,"amenities":["Teras","Dapur","Area cuci"],"monthly":{"price":2400000,"minimum":6},"yearly":null,"terms":"Survei wajib sebelum menyepakati penyewaan.","extra_costs":"Listrik, air, dan biaya lingkungan dibahas dengan pengelola.","status":"Tersedia"},
-  {"code":"DEMO-004","name":"Rumah Halaman Lapang","area":"Kawasan Barat (contoh)","address":"Alamat demonstrasi 04, bukan alamat properti sebenarnya.","maps_url":"https://www.google.com/maps","description":"Rumah demonstrasi berstatus Dipesan untuk memperlihatkan tombol survei nonaktif.","land_size":180,"building_size":130,"bedrooms":4,"bathrooms":2,"amenities":["Carport","Halaman","Dapur"],"monthly":{"price":5000000,"minimum":3},"yearly":{"price":55000000,"minimum":1},"terms":"Contoh data: pemesanan ditahan setelah verifikasi DP oleh admin.","extra_costs":"Dibahas dengan pengelola.","status":"Dipesan"},
-  {"code":"DEMO-005","name":"Rumah Pagi Cerah","area":"Kawasan Barat (contoh)","address":"Alamat demonstrasi 05, bukan alamat properti sebenarnya.","maps_url":"https://www.google.com/maps","description":"Data demonstrasi rumah tersewa tahunan, dengan tanggal akhir lewat untuk menguji penanda Perlu ditinjau.","land_size":100,"building_size":80,"bedrooms":2,"bathrooms":2,"amenities":["Teras","Dapur"],"monthly":{"price":3000000,"minimum":3},"yearly":{"price":32000000,"minimum":1},"terms":"Data demonstrasi.","extra_costs":"Data demonstrasi.","status":"Tersewa"},
-  {"code":"DEMO-006","name":"Rumah Kebun Kecil","area":"Kawasan Selatan (contoh)","address":"Alamat demonstrasi 06, bukan alamat properti sebenarnya.","maps_url":"https://www.google.com/maps","description":"Data demonstrasi rumah tersewa bulanan, berakhir lima hari lagi untuk menguji penanda Segera berakhir.","land_size":110,"building_size":85,"bedrooms":2,"bathrooms":1,"amenities":["Taman","Teras"],"monthly":{"price":2800000,"minimum":3},"yearly":{"price":30000000,"minimum":1},"terms":"Data demonstrasi.","extra_costs":"Data demonstrasi.","status":"Tersewa"},
-  {"code":"DEMO-007","name":"Rumah Dalam Persiapan","area":"Kawasan Taman (contoh)","address":"Alamat demonstrasi 07, bukan alamat properti sebenarnya.","maps_url":"https://www.google.com/maps","description":"Draft demonstrasi hanya dapat dilihat admin.","land_size":80,"building_size":60,"bedrooms":2,"bathrooms":1,"amenities":[],"monthly":null,"yearly":null,"terms":"","extra_costs":"","status":"Draft"}
+  {
+    "code": "DEMO-001",
+    "name": "Bangunan Taman Teduh",
+    "area": "Kawasan Taman (contoh)",
+    "address": "Alamat demonstrasi 01, bukan alamat properti sebenarnya.",
+    "maps_url": "https://www.google.com/maps",
+    "description": "Contoh bangunan dengan ruang keluarga yang terhubung ke teras dan taman kecil. Seluruh informasi, lokasi, harga, dan foto hanya digunakan untuk demonstrasi aplikasi.",
+    "land_size": 120,
+    "building_size": 90,
+    "bedrooms": 3,
+    "bathrooms": 2,
+    "amenities": [
+      "Carport",
+      "Teras",
+      "Taman",
+      "Dapur"
+    ],
+    "monthly": {
+      "price": 3500000,
+      "minimum": 3
+    },
+    "yearly": {
+      "price": 38000000,
+      "minimum": 1
+    },
+    "terms": "Contoh: penggunaan aset dan ketentuan pemeliharaan dibahas saat survei.",
+    "extra_costs": "Contoh: listrik dan air mengikuti pemakaian.",
+    "status": "Tersedia",
+    "asset_type": "building",
+    "access": "Contoh: akses jalan lingkungan; lebar jalan dan kendaraan yang dapat masuk dikonfirmasi saat survei.",
+    "land_condition": ""
+  },
+  {
+    "code": "DEMO-002",
+    "name": "Tanah Kosong Selatan",
+    "area": "Kawasan Selatan (contoh)",
+    "address": "Alamat demonstrasi 02, bukan alamat properti sebenarnya.",
+    "maps_url": "https://www.google.com/maps",
+    "description": "Contoh bidang tanah kosong untuk demonstrasi katalog. Penggunaan, batas bidang, dan kesesuaian kebutuhan dibahas dengan pengelola setelah survei. Bukan penawaran lahan sebenarnya.",
+    "land_size": 150,
+    "building_size": 0,
+    "bedrooms": 0,
+    "bathrooms": 0,
+    "amenities": [
+      "Akses jalan lingkungan (contoh)",
+      "Area terbuka (contoh)"
+    ],
+    "monthly": null,
+    "yearly": {
+      "price": 52000000,
+      "minimum": 1
+    },
+    "terms": "Survei dan kesepakatan langsung dengan pengelola.",
+    "extra_costs": "Konfirmasikan biaya lingkungan kepada pengelola.",
+    "status": "Tersedia",
+    "asset_type": "land",
+    "access": "Contoh: akses jalan lingkungan; lebar jalan dan kendaraan yang dapat masuk dikonfirmasi saat survei.",
+    "land_condition": "Contoh: lahan terbuka dengan permukaan relatif datar dan vegetasi rendah. Kondisi, drainase, serta batas bidang wajib diperiksa saat survei."
+  },
+  {
+    "code": "DEMO-003",
+    "name": "Tanah Kosong Taman",
+    "area": "Kawasan Taman (contoh)",
+    "address": "Alamat demonstrasi 03, bukan alamat properti sebenarnya.",
+    "maps_url": "https://www.google.com/maps",
+    "description": "Contoh bidang tanah kosong untuk demonstrasi katalog. Penggunaan, batas bidang, dan kesesuaian kebutuhan dibahas dengan pengelola setelah survei. Bukan penawaran lahan sebenarnya.",
+    "land_size": 90,
+    "building_size": 0,
+    "bedrooms": 0,
+    "bathrooms": 0,
+    "amenities": [
+      "Akses jalan lingkungan (contoh)",
+      "Area terbuka (contoh)"
+    ],
+    "monthly": {
+      "price": 2400000,
+      "minimum": 6
+    },
+    "yearly": null,
+    "terms": "Survei wajib sebelum menyepakati penyewaan.",
+    "extra_costs": "Listrik, air, dan biaya lingkungan dibahas dengan pengelola.",
+    "status": "Tersedia",
+    "asset_type": "land",
+    "access": "Contoh: akses jalan lingkungan; lebar jalan dan kendaraan yang dapat masuk dikonfirmasi saat survei.",
+    "land_condition": "Contoh: lahan terbuka dengan permukaan relatif datar dan vegetasi rendah. Kondisi, drainase, serta batas bidang wajib diperiksa saat survei."
+  },
+  {
+    "code": "DEMO-004",
+    "name": "Bangunan Halaman Lapang",
+    "area": "Kawasan Barat (contoh)",
+    "address": "Alamat demonstrasi 04, bukan alamat properti sebenarnya.",
+    "maps_url": "https://www.google.com/maps",
+    "description": "Bangunan demonstrasi berstatus Dipesan untuk memperlihatkan tombol survei nonaktif.",
+    "land_size": 180,
+    "building_size": 130,
+    "bedrooms": 4,
+    "bathrooms": 2,
+    "amenities": [
+      "Carport",
+      "Halaman",
+      "Dapur"
+    ],
+    "monthly": {
+      "price": 5000000,
+      "minimum": 3
+    },
+    "yearly": {
+      "price": 55000000,
+      "minimum": 1
+    },
+    "terms": "Contoh data: pemesanan ditahan setelah verifikasi DP oleh admin.",
+    "extra_costs": "Dibahas dengan pengelola.",
+    "status": "Dipesan",
+    "asset_type": "building",
+    "access": "Contoh: akses jalan lingkungan; lebar jalan dan kendaraan yang dapat masuk dikonfirmasi saat survei.",
+    "land_condition": ""
+  },
+  {
+    "code": "DEMO-005",
+    "name": "Bangunan Pagi Cerah",
+    "area": "Kawasan Barat (contoh)",
+    "address": "Alamat demonstrasi 05, bukan alamat properti sebenarnya.",
+    "maps_url": "https://www.google.com/maps",
+    "description": "Data demonstrasi bangunan tersewa tahunan, dengan tanggal akhir lewat untuk menguji penanda Perlu ditinjau.",
+    "land_size": 100,
+    "building_size": 80,
+    "bedrooms": 2,
+    "bathrooms": 2,
+    "amenities": [
+      "Teras",
+      "Dapur"
+    ],
+    "monthly": {
+      "price": 3000000,
+      "minimum": 3
+    },
+    "yearly": {
+      "price": 32000000,
+      "minimum": 1
+    },
+    "terms": "Data demonstrasi.",
+    "extra_costs": "Data demonstrasi.",
+    "status": "Tersewa",
+    "asset_type": "building",
+    "access": "Contoh: akses jalan lingkungan; lebar jalan dan kendaraan yang dapat masuk dikonfirmasi saat survei.",
+    "land_condition": ""
+  },
+  {
+    "code": "DEMO-006",
+    "name": "Bangunan Kebun Kecil",
+    "area": "Kawasan Selatan (contoh)",
+    "address": "Alamat demonstrasi 06, bukan alamat properti sebenarnya.",
+    "maps_url": "https://www.google.com/maps",
+    "description": "Data demonstrasi bangunan tersewa bulanan, berakhir lima hari lagi untuk menguji penanda Segera berakhir.",
+    "land_size": 110,
+    "building_size": 85,
+    "bedrooms": 2,
+    "bathrooms": 1,
+    "amenities": [
+      "Taman",
+      "Teras"
+    ],
+    "monthly": {
+      "price": 2800000,
+      "minimum": 3
+    },
+    "yearly": {
+      "price": 30000000,
+      "minimum": 1
+    },
+    "terms": "Data demonstrasi.",
+    "extra_costs": "Data demonstrasi.",
+    "status": "Tersewa",
+    "asset_type": "building",
+    "access": "Contoh: akses jalan lingkungan; lebar jalan dan kendaraan yang dapat masuk dikonfirmasi saat survei.",
+    "land_condition": ""
+  },
+  {
+    "code": "DEMO-007",
+    "name": "Bangunan Dalam Persiapan",
+    "area": "Kawasan Taman (contoh)",
+    "address": "Alamat demonstrasi 07, bukan alamat properti sebenarnya.",
+    "maps_url": "https://www.google.com/maps",
+    "description": "Draft demonstrasi hanya dapat dilihat admin.",
+    "land_size": 80,
+    "building_size": 60,
+    "bedrooms": 2,
+    "bathrooms": 1,
+    "amenities": [],
+    "monthly": null,
+    "yearly": null,
+    "terms": "",
+    "extra_costs": "",
+    "status": "Draft",
+    "asset_type": "building",
+    "access": "Contoh: akses jalan lingkungan; lebar jalan dan kendaraan yang dapat masuk dikonfirmasi saat survei.",
+    "land_condition": ""
+  }
 ]

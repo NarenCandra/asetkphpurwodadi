@@ -26,6 +26,8 @@ def seed_demo():
             for position in range(2):
                 asset_index = (index + position) % 3 + 1
                 source = app.ROOT / 'demo' / f'house-{asset_index}.jpg'
+                if house.get('asset_type') == 'land':
+                    source = app.ROOT / 'demo' / f'land-{position+1}.jpg'
                 if not source.exists():
                     source = app.ROOT / 'demo' / f'house-{asset_index}.svg'
                 photo_id = secrets.token_hex(16)

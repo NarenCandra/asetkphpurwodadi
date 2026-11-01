@@ -373,7 +373,20 @@ body[data-view='home'] .site-header:not(.is-scrolled) .brand .brand-icon {
 
 .brand, .site-footer .brand { align-items: flex-end; }
 .header-logo-text { padding-bottom: 0; }
+.brand.brand-organization { align-items: center; letter-spacing: -.025em; }
+.brand-organization .organization-name { display: block; font-size: 1.25rem; line-height: 1.2; color: inherit; }
+.brand-organization .organization-unit { display: block; margin-top: 4px; font-size: .875rem; line-height: 1.25; font-weight: 500; letter-spacing: .015em; color: inherit; }
+@media (max-width:720px) {
+  .brand-organization .organization-name { font-size: 1.0625rem; }
+  .brand-organization .organization-unit { font-size: .75rem; margin-top: 3px; }
+}
 .brand-icon { margin-bottom: 0; }
+.brand.brand-organization .brand-icon { width: 54px; height: 54px; flex-basis: 54px; }
+.site-footer .brand.brand-organization .brand-icon { width: 48px; height: 48px; flex-basis: 48px; }
+@media (max-width:720px) {
+  .brand.brand-organization .brand-icon,
+  .site-footer .brand.brand-organization .brand-icon { width: 48px; height: 48px; flex-basis: 48px; }
+}
 .contact-panel, .offer-panel, .form-section, .admin-section, .filter-box, .admin-filter { background: white; border-color: #dbe4d6; }
 .spec-grid, .offer { background: var(--wash); }
 .card-body h3, .page-head h1, .detail-layout h1 { color: var(--green-dark); }
@@ -465,6 +478,8 @@ body[data-view='home'] .site-header,
 #app { min-height: 100svh; display: flex; flex-direction: column; }
 #main { flex: 1 0 auto; min-width: 0; }
 .catalog-layout [hidden], .catalog-layout > [hidden] { display: none !important; }
+.edit-layout [hidden] { display: none !important; }
+.edit-layout [hidden] { display: none !important; }
 .catalog-layout.without-filters { grid-template-columns: minmax(0,1fr); }
 .site-header { flex-shrink: 0; }
 .site-header { view-transition-name: site-navigation; }

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+  <rect width="1200" height="800" fill="#dfe9e3"/>
+  <path d="M0 520 250 370 570 450 900 310 1200 400V800H0Z" fill="#829c70"/>
+  <path d="m190 570 540-160 275 150-560 180Z" fill="#b9c591" stroke="#fff" stroke-width="5" stroke-dasharray="15 10"/>
+  <path d="m0 720 1200-310" stroke="#b1b6ad" stroke-width="75"/>
+  <path d="m0 720 1200-310" stroke="#f4f2db" stroke-width="3" stroke-dasharray="30 20"/>
+  <g fill="#42694c"><circle cx="130" cy="430" r="65"/><circle cx="1040" cy="330" r="80"/><circle cx="1120" cy="620" r="50"/></g>
+  <text x="70" y="105" font-family="sans-serif" font-size="38" fill="#203e2c">Tanah kosong · ilustrasi demonstrasi</text>
+  <text x="70" y="155" font-family="sans-serif" font-size="23" fill="#203e2c">Bukan foto atau batas bidang aset sebenarnya</text>
+</svg>

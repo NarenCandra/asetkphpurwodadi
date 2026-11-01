@@ -39,6 +39,8 @@ if args.apply_demo:
             entries = db.execute('SELECT * FROM photos WHERE house_id=? ORDER BY position,id', (house['id'],)).fetchall()
             for position, entry in enumerate(entries):
                 source = root / 'demo' / f'house-{(index+position)%3+1}.jpg'
+                if json.loads(house['body']).get('asset_type') == 'land':
+                    source = root / 'demo' / f'land-{position%2+1}.jpg'
                 old = app.DATA / 'uploads' / entry['filename']
                 if old.exists():
                     backup.mkdir(parents=True, exist_ok=True)

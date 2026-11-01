@@ -11,17 +11,17 @@ const houses = records.flatMap((house, index) => {
   if (!['Tersedia','Dipesan'].includes(house.status)) return [];
   const id = crypto.createHash('sha256').update(house.code).digest('hex').slice(0,24);
   const photos = Array.from({length:2}, (_, position) => {
-    const name = `house-${(index+position)%3+1}.jpg`;
+    const name = house.asset_type==='land' ? `land-${position+1}.jpg` : `house-${(index+position)%3+1}.jpg`;
     fs.copyFileSync(path.join(root, 'demo', name), path.join(output, 'assets', name));
     return {id:`${id}-${position}`,url:`/assets/${name}`};
   });
-  const fields = ['code','name','area','address','maps_url','description','land_size','building_size','bedrooms','bathrooms','amenities','monthly','yearly','terms','extra_costs','status'];
+  const fields = ['asset_type','access','land_condition','code','name','area','address','maps_url','description','land_size','building_size','bedrooms','bathrooms','amenities','monthly','yearly','terms','extra_costs','status'];
   const publicHouse = Object.fromEntries(fields.map(key=>[key,house[key]]));
   return [{...publicHouse,id,revision:1,demo:true,photos}];
 });
 const config = {
-  name:'Sewaruma',
-  profile:'Jelajahi pilihan rumah sewa bulanan dan tahunan. Profil, foto, lokasi, dan harga pada website ini merupakan data demonstrasi, bukan penawaran properti sebenarnya.',
+  name:'Sewa Aset Perhutani KPH Purwodadi',
+  profile:'Jelajahi pilihan bangunan dan tanah kosong yang disewakan oleh Opset Perhutani KPH Purwodadi. Foto, lokasi, dan harga pada demo ini merupakan data contoh, bukan penawaran properti sebenarnya.',
   areas:'Kawasan Taman, Selatan, dan Barat (contoh)',
   hours:'Senin–Sabtu, 09.00–17.00 WIB (contoh)',
   whatsapp:null,whatsapp_display:'Nomor pengelola belum dikonfigurasi.',timezone:'Asia/Jakarta'

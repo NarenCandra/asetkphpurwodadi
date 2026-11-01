@@ -1,5 +1,13 @@
 # Acuan produk
 
+## Revisi kebutuhan yang disetujui 1 November 2026
+
+Nama sementara aplikasi: **Sewa Aset Perhutani KPH Purwodadi**. Objek sewa mencakup **bangunan dan tanah kosong**, dikelola Opset Perhutani KPH Purwodadi. Label publik memakai Daftar Aset/Jelajahi Aset dan admin memakai Kelola Aset. Judul beranda: “Temukan Bangunan dan Tanah Sesuai Kebutuhan Anda”.
+
+Jenis aset dipilih pada form admin, tanpa menambahkan filter jenis ke katalog. Bangunan menampilkan luas tanah, luas bangunan, akses, dan fasilitas; tanah kosong menampilkan luas tanah, akses, serta kondisi lahan. Kamar tidur dan kamar mandi tidak menjadi spesifikasi wajib publikasi. Tanah kosong tidak memerlukan luas bangunan. Filter tetap kawasan, periode bulanan/tahunan, dan slider harga. Survei wajib, negosiasi, DP, pelunasan, serta siklus status tetap mengikuti ketentuan sebelumnya. Data lama tanpa jenis aset diperlakukan sebagai bangunan.
+
+Revisi ini menggantikan penyebutan rumah dan spesifikasi wajib kamar pada dokumen awal di bawah.
+
 Disalin dari PRD_Web_Penyewaan_Rumah_v0_2.docx. Dokumen DOCX adalah sumber utama.
 
 PRD Website Penyewaan Rumah

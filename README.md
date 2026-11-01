@@ -22,6 +22,8 @@ Alternatif: `npm.cmd run dev` di PowerShell atau `npm run dev` pada shell yang m
 
 ## Demo statis di Netlify
 
+Demo yang sama juga dapat dipublikasikan ke Vercel: `vercel.json` menetapkan build `node scripts/build-demo.cjs` dan output `dist`, beserta rewrite halaman katalog, detail, kontak, dan admin. Root Directory di dashboard Vercel harus root repository, bukan `public`. Backend lokal Python tidak dijalankan dalam mode demo ini.
+
 `netlify.toml` di root repository menjalankan `node scripts/build-demo.cjs` dan memublikasikan folder `dist`. Konfigurasi ini menggantikan pengaturan manual sebelumnya yang memakai `public`. Build hanya membaca konten contoh di `demo/` dan aset frontend; tidak membaca `.env`, database, foto unggahan admin, atau kredensial.
 
 Demo menampilkan empat rumah publik contoh, filter, galeri, dan halaman kontak. URL langsung `/rumah/<id>`, `/tentang`, dan `/admin` diatur melalui rewrite. ID demo stabil antar-build. Panel admin menampilkan keterangan bahwa backend belum tersedia; perubahan data dan WhatsApp tidak diaktifkan pada demo. Website lokal yang dijalankan dengan `python app.py serve` tetap menggunakan API dan database asli.

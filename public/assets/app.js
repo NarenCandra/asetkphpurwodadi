@@ -43,6 +43,9 @@ async function api(path, options={}) {
     throw new Error('Fitur ini membutuhkan backend aktif.');
   }
   const response = await fetch(path, {...options, headers:{'Content-Type':'application/json',...(state.session.csrf ? {'X-CSRF-Token':state.session.csrf}:{}),...options.headers}});
+  if (!response.headers.get('content-type')?.includes('application/json')) {
+    throw new Error('Layanan data belum tersedia. Untuk demo hosting, gunakan hasil build demo dari folder dist.');
+  }
   const data = await response.json();
   if (!response.ok) {
     if (response.status === 401 && path !== '/api/login') state.session = {authenticated:false};

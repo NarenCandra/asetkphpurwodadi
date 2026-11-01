@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "node scripts/build-demo.cjs",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {"source": "/rumah", "destination": "/index.html"},
+    {"source": "/rumah/:id", "destination": "/index.html"},
+    {"source": "/tentang", "destination": "/index.html"},
+    {"source": "/admin", "destination": "/index.html"},
+    {"source": "/admin/:path*", "destination": "/index.html"}
+  ]
+}

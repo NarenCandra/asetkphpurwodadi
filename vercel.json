@@ -4,10 +4,41 @@
   "buildCommand": "node scripts/build-demo.cjs",
   "outputDirectory": "dist",
   "rewrites": [
-    {"source": "/rumah", "destination": "/index.html"},
-    {"source": "/rumah/:id", "destination": "/index.html"},
-    {"source": "/tentang", "destination": "/index.html"},
-    {"source": "/admin", "destination": "/index.html"},
-    {"source": "/admin/:path*", "destination": "/index.html"}
+    {
+      "source": "/rumah",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/rumah/:id",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/tentang",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/admin",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/admin/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/masuk",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/daftar",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/akun",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/akun/:path*",
+      "destination": "/index.html"
+    }
   ]
 }

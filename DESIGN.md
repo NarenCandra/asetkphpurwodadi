@@ -1,3 +1,5 @@
+> Arah desain terbaru: lihat [DESIGN_v0_3.md](DESIGN_v0_3.md). Catatan berikut menyimpan arah visual awal dan dapat memuat istilah lama.
+
 # Arah visual Sewaruma: Teras Hijau
 
 Acuan kebutuhan: `PRD.md`, dengan revisi pengguna sesudah PRD. Nama usaha adalah Sewaruma. Bagian pengenalan, Rumah Tersedia, dan footer beranda dihapus atas permintaan pengguna; beranda kini hanya navigasi dan hero foto penuh. Katalog tetap diakses melalui Jelajahi Rumah atau navbar. Profil pengelola ada di Tentang & Kontak dan footer tetap ditampilkan pada halaman selain beranda.

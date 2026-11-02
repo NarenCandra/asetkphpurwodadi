@@ -94,7 +94,7 @@ function shell(content, title='Sewa aset') {
   const path = location.pathname;
   document.body.dataset.page = path==='/tentang' ? 'about' : path==='/rumah' ? 'catalog' : '';
   document.body.dataset.view = path.startsWith('/admin') ? 'admin' : path==='/' ? 'home' : 'public';
-  $('#app').innerHTML = `<header class="site-header"><div class="container header-inner"><a class="brand" href="/">${icon}<span class="header-logo-text">${esc(businessName)}</span></a><button class="menu-toggle" aria-expanded="false" aria-controls="nav">Menu</button><nav class="nav" id="nav" aria-label="Navigasi utama"><a href="/" ${path==='/'?'aria-current="page"':''}>Beranda</a><a href="/rumah" ${path.startsWith('/rumah')?'aria-current="page"':''}>Daftar Aset</a><a href="/tentang" ${path==='/tentang'?'aria-current="page"':''}>Tentang & Kontak</a>${path.startsWith('/admin')?'<a href="/admin">Kelola Aset</a>':''}</nav></div></header><main id="main" tabindex="-1">${content}</main><footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/">${icon}<span>${esc(businessName)}</span></a></div><div class="footer-links"><a href="/rumah">Daftar Aset</a><a href="/tentang">Kontak</a><a href="/admin">Kelola Aset</a></div></div></footer>`;
+  $('#app').innerHTML = `<header class="site-header"><div class="container header-inner"><a class="brand" href="/">${icon}<span class="header-logo-text">${esc(businessName)}</span></a><button class="menu-toggle" aria-expanded="false" aria-controls="nav">Menu</button><nav class="nav" id="nav" aria-label="Navigasi utama"><a href="/" ${path==='/'?'aria-current="page"':''}>Beranda</a><a href="/rumah" ${path.startsWith('/rumah')?'aria-current="page"':''}>Daftar Aset</a><a href="/tentang" ${path==='/tentang'?'aria-current="page"':''}>Tentang & Kontak</a>${!path.startsWith('/admin')?`<a class="nav-account" href="${tenantDemoActive()?'/akun/profil':'/masuk'}" ${/^\/(masuk|daftar|akun)/.test(path)?'aria-current="page"':''}>${tenantDemoActive()?'Akun Demo':'Masuk Penyewa'}</a>`:''}${path.startsWith('/admin')?'<a href="/admin">Kelola Aset</a>':''}</nav></div></header><main id="main" tabindex="-1">${content}</main><footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/">${icon}<span>${esc(businessName)}</span></a></div><div class="footer-links"><a href="/rumah">Daftar Aset</a><a href="/tentang">Kontak</a><a href="/admin">Kelola Aset</a></div></div></footer>`;
   if (businessName.toLowerCase()==='sewaruma') {
     $$('.brand').forEach(brand => {
       brand.setAttribute('aria-label', businessName);
@@ -253,9 +253,8 @@ function updateResults() {
   }
 }
 function detail(house) {
-  const chat = whatsapp(house);
-  const canChat = house.status==='Tersedia'&&chat;
-  shell(`<div class="container"><div class="breadcrumb"><a href="/rumah">Daftar Aset</a> / ${esc(house.name)}</div><div class="gallery">${house.photos.slice(0,3).map((p,i)=>`<button data-gallery="${i}" aria-label="Buka galeri foto ${i+1}">${photo(house,i,i===0)}</button>`).join('')||'<div class="placeholder">Foto belum tersedia</div>'}</div>${house.photos.length>3?`<button id="all-photos" class="text-button">Lihat ${house.photos.length} foto</button>`:''}<div class="detail-layout"><div>${badge(house.status)}<h1>${esc(house.name)}</h1><p class="muted">${esc(house.code)} · ${esc(house.area)}</p>${house.demo?'<div class="notice">Data dan foto demonstrasi. Bukan penawaran aset sebenarnya.</div>':''}<div class="spec-grid">${assetSpecs(house)}</div>${house.asset_type==='land'?`<section class="detail-block"><h2>Akses dan kondisi lahan</h2><p>${esc(house.access)||'Informasi akses dibahas saat survei.'}</p><p>${esc(house.land_condition)||'Kondisi lahan dikonfirmasi saat survei.'}</p></section>`:''}<section class="detail-block"><h2>Tentang aset</h2><p>${esc(house.description)}</p></section><section class="detail-block"><h2>Fasilitas</h2><div class="amenities">${house.amenities.map(a=>`<span>${esc(a)}</span>`).join('')||'<p>Belum ada informasi fasilitas.</p>'}</div></section><section class="detail-block"><h2>Lokasi aset</h2><p>${esc(house.address)}</p>${house.maps_url?`<a href="${esc(house.maps_url)}" target="_blank" rel="noopener noreferrer">Buka Google Maps</a>`:''}</section><section class="detail-block"><h2>Ketentuan sewa</h2><p>${esc(house.terms)||'Ketentuan dibahas bersama pengelola.'}</p><p>Survei wajib sebelum kesepakatan sewa. Nominal DP, tenggat pelunasan, dan aturan pengembalian disepakati melalui WhatsApp sebelum pembayaran.</p><h3>Biaya tambahan</h3><p>${esc(house.extra_costs)||'Konfirmasikan biaya tambahan kepada pengelola.'}</p></section></div><aside class="offer-panel"><h2>Pilihan sewa</h2>${['monthly','yearly'].filter(p=>house[p]).map(p=>`<div class="offer">${priceLabel(house,p)}<p>Minimum sewa ${house[p].minimum} ${periodName(p)}</p></div>`).join('')}<p class="small">Harga dapat dinegosiasikan melalui WhatsApp.</p>${canChat?`<a class="btn" href="${esc(chat)}" target="_blank" rel="noopener noreferrer">Jadwalkan Survei via WhatsApp</a>`:`<button class="btn" disabled>Jadwalkan Survei via WhatsApp</button>`}<p class="small">${house.status==='Dipesan'?'Aset sedang dipesan. Pengajuan survei dinonaktifkan.':!chat?'Nomor WhatsApp pengelola belum dikonfigurasi.':'Jadwal survei perlu dikonfirmasi pengelola melalui percakapan. Membuka chat belum berarti aset dipesan.'}</p>${house.status==='Dipesan'?'<a class="small" href="/tentang">Kontak umum pengelola</a>':''}</aside></div></div><dialog class="modal" id="gallery-modal"><div id="gallery-image"></div><div class="modal-bar"><button class="btn secondary small" id="photo-prev">Sebelumnya</button><p id="photo-counter"></p><button class="btn secondary small" id="photo-next">Berikutnya</button><button class="text-button" id="photo-close">Tutup</button></div></dialog>`,house.name);
+  const canChat = house.status==='Tersedia';
+  shell(`<div class="container"><div class="breadcrumb"><a href="/rumah">Daftar Aset</a> / ${esc(house.name)}</div><div class="gallery">${house.photos.slice(0,3).map((p,i)=>`<button data-gallery="${i}" aria-label="Buka galeri foto ${i+1}">${photo(house,i,i===0)}</button>`).join('')||'<div class="placeholder">Foto belum tersedia</div>'}</div>${house.photos.length>3?`<button id="all-photos" class="text-button">Lihat ${house.photos.length} foto</button>`:''}<div class="detail-layout"><div>${badge(house.status)}<h1>${esc(house.name)}</h1><p class="muted">${esc(house.code)} · ${esc(house.area)}</p>${house.demo?'<div class="notice">Data dan foto demonstrasi. Bukan penawaran aset sebenarnya.</div>':''}<div class="spec-grid">${assetSpecs(house)}</div>${house.asset_type==='land'?`<section class="detail-block"><h2>Akses dan kondisi lahan</h2><p>${esc(house.access)||'Informasi akses dibahas saat survei.'}</p><p>${esc(house.land_condition)||'Kondisi lahan dikonfirmasi saat survei.'}</p></section>`:''}<section class="detail-block"><h2>Tentang aset</h2><p>${esc(house.description)}</p></section><section class="detail-block"><h2>Fasilitas</h2><div class="amenities">${house.amenities.map(a=>`<span>${esc(a)}</span>`).join('')||'<p>Belum ada informasi fasilitas.</p>'}</div></section><section class="detail-block"><h2>Lokasi aset</h2><p>${esc(house.address)}</p>${house.maps_url?`<a href="${esc(house.maps_url)}" target="_blank" rel="noopener noreferrer">Buka Google Maps</a>`:''}</section><section class="detail-block"><h2>Ketentuan sewa</h2><p>${esc(house.terms)||'Ketentuan dibahas bersama pengelola.'}</p><p>Survei wajib sebelum kesepakatan sewa. Nominal DP, tenggat pelunasan, dan aturan pengembalian disepakati melalui WhatsApp sebelum pembayaran.</p><h3>Biaya tambahan</h3><p>${esc(house.extra_costs)||'Konfirmasikan biaya tambahan kepada pengelola.'}</p></section></div><aside class="offer-panel"><h2>Pilihan sewa</h2>${['monthly','yearly'].filter(p=>house[p]).map(p=>`<div class="offer">${priceLabel(house,p)}<p>Minimum sewa ${house[p].minimum} ${periodName(p)}</p></div>`).join('')}<p class="small">Harga dapat dinegosiasikan melalui WhatsApp.</p>${canChat?`<a class="btn" href="/masuk?next=${encodeURIComponent('/rumah/'+house.id)}">Jadwalkan Survei via WhatsApp</a>`:`<button class="btn" disabled>Jadwalkan Survei via WhatsApp</button>`}<p class="small">${house.status==='Dipesan'?'Aset sedang dipesan. Pengajuan survei dinonaktifkan.':'Masuk atau daftar sebagai penyewa untuk mengajukan survei. KTP tidak diperlukan pada tahap survei. Alur akun masih berupa pratinjau desain.'}</p>${house.status==='Dipesan'?'<a class="small" href="/tentang">Kontak umum pengelola</a>':''}</aside></div></div><dialog class="modal" id="gallery-modal"><div id="gallery-image"></div><div class="modal-bar"><button class="btn secondary small" id="photo-prev">Sebelumnya</button><p id="photo-counter"></p><button class="btn secondary small" id="photo-next">Berikutnya</button><button class="text-button" id="photo-close">Tutup</button></div></dialog>`,house.name);
   let current=0;
   $('#gallery-modal').setAttribute('aria-label', `Galeri foto ${house.name}`);
   const showPhoto = i=>{current=(i+house.photos.length)%house.photos.length;$('#gallery-image').innerHTML=photo(house,current,true);$('#photo-counter').textContent=`${current+1} / ${house.photos.length}`;};
@@ -282,6 +281,17 @@ function login() {
   loginWrap.before(scene);
   scene.innerHTML = '<div class="login-art" aria-hidden="true"><img src="/assets/login-house.svg" alt=""><span class="login-art-caption">Sewa Aset Perhutani<br>KPH Purwodadi</span></div>';
   scene.append(loginWrap);
+  if (['localhost','127.0.0.1','[::1]'].includes(location.hostname)) {
+    const demoHint=document.createElement('div');
+    demoHint.className='tenant-demo-credentials';
+    demoHint.innerHTML='<strong>Akun admin demo lokal</strong><p>Username: <code>admin.demo</code><br>Kata sandi: <code>AdminDemo2026!</code></p><button type="button" class="text-button" id="fill-admin-demo">Isi akun demo</button>';
+    $('#login-form').before(demoHint);
+    $('#fill-admin-demo').onclick=()=>{
+      $('#username').value='admin.demo';
+      $('#password').value='AdminDemo2026!';
+      $('#username').focus();
+    };
+  }
   $('#login-form').onsubmit=async e=>{
     e.preventDefault();const button=$('button',e.target);button.disabled=true;
     try {state.session=await api('/api/login',{method:'POST',body:JSON.stringify({username:$('#username').value,password:$('#password').value})});navigate('/admin');}
@@ -289,7 +299,8 @@ function login() {
   };
 }
 function adminShell(content,title,actions='') {
-  shell(`<div class="container admin-bottom"><div class="admin-top"><div><h1>${title}</h1><p class="muted small">Panel pengelola</p></div><div class="admin-actions">${actions}<button class="btn secondary small" id="logout">Keluar</button></div></div><nav class="admin-nav" aria-label="Navigasi admin"><a href="/admin" ${location.pathname==='/admin'?'aria-current="page"':''}>Beranda Admin</a><a href="/admin/rumah" ${location.pathname.startsWith('/admin/rumah')?'aria-current="page"':''}>Kelola Aset</a></nav>${content}</div>`,title);
+  shell(`<div class="container admin-bottom"><div class="admin-top"><div><h1>${title}</h1><p class="muted small">Panel pengelola</p></div><div class="admin-actions">${actions}<button class="btn secondary small" id="logout">Keluar</button></div></div><nav class="admin-nav" aria-label="Navigasi admin"><a href="/admin" ${location.pathname==='/admin'?'aria-current="page"':''}>Beranda Admin</a><a href="/admin/rumah" ${location.pathname.startsWith('/admin/rumah')?'aria-current="page"':''}>Kelola Aset</a><a href="/admin/pengajuan" ${location.pathname==='/admin/pengajuan'?'aria-current="page"':''}>Pengajuan & Dokumen</a></nav>${content}</div>`,title);
+  if(window.SEWARUMA_STATIC_DEMO) $('#logout').style.display='none';
   $('#logout').onclick=async()=>{try{await api('/api/logout',{method:'POST',body:'{}'});state.session={authenticated:false};navigate('/admin');}catch(error){toast(error.message);}};
 }
 function adminTable(houses) {
@@ -396,14 +407,24 @@ async function route() {
   const path=location.pathname;
   try {
     if(!state.config)state.config=await api('/api/config');
+    if(path==='/masuk') return tenantAuth();
+    if(path==='/daftar') return tenantAuth(true);
+    if(path==='/akun'||path==='/akun/profil') return tenantProfile();
+    if(path==='/akun/pengajuan') return tenantApplications();
+    if(path==='/akun/pengajuan/pratinjau') return submissionDetailDesign();
+    if(path==='/akun/sewa') return tenantLeases();
+    if(path==='/akun/perpanjangan') return renewalDesign();
+    if(path==='/akun/survei') return await surveyDesign();
     if(path.startsWith('/admin')){
       if(window.SEWARUMA_STATIC_DEMO) {
-        shell(`<div class="container section">${empty('Panel admin belum tersedia pada demo','Website ini menampilkan data contoh. Pengelolaan aset memerlukan backend dan penyimpanan data aktif.','<a class="btn" href="/rumah">Lihat katalog demo</a>')}</div>`,'Demo Admin');
+        if(path==='/admin/pengajuan') return adminRequestsDesign();
+        shell(`<div class="container section">${empty('Panel admin belum tersedia pada demo','Website ini menampilkan data contoh. Pengelolaan aset memerlukan backend dan penyimpanan data aktif.','<a class="btn" href="/rumah">Lihat katalog demo</a><a class="btn secondary" href="/admin/pengajuan">Pratinjau pengajuan & dokumen</a>')}</div>`,'Demo Admin');
         return;
       }
       state.session=await api('/api/session');
       if(id!==navigationId)return;
       if(!state.session.authenticated)return login();
+      if(path==='/admin/pengajuan')return adminRequestsDesign();
       if(path==='/admin') {state.adminHouses=await api('/api/admin/houses');if(id===navigationId)dashboard();return;}
       if(path==='/admin/rumah'){state.adminHouses=await api('/api/admin/houses');if(id===navigationId)manage();return;}
       if(path==='/admin/rumah/baru')return editor();

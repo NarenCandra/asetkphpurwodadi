@@ -1,0 +1,108 @@
+/* PRD 0.3: the existing public identity extends into tenant and document screens. */
+.nav .nav-account { border: 1px solid #b8c9b0; margin-left: 8px; }
+.nav a[href='/tentang'],
+body[data-view='home'] .site-header:not(.is-scrolled) .nav a[href='/tentang'] { border: 0; margin-left: 0; }
+.tenant-page, .tenant-auth { padding-top: 30px; padding-bottom: 60px; }
+.design-notice { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 16px 20px; margin-bottom: 28px; border-left: 3px solid #89a467; background: #e9efdf; color: #344b32; font-size: .875rem; line-height: 1.65; }
+.design-notice strong { font-weight: 650; }
+.tenant-auth-layout { display: grid; grid-template-columns: 1.05fr 1fr; border: 1px solid #dbe5da; border-radius: 20px; overflow: hidden; background: #fff; }
+.tenant-auth-intro { padding: 48px; background: #164b36; color: #fff; position: relative; }
+.tenant-auth-intro img { display: block; width: 86px; height: 86px; padding: 7px; background: #f4f7f3; border-radius: 16px; margin-bottom: 34px; }
+.tenant-auth-intro h1 { font-size: clamp(2.1rem,3.4vw,3.2rem); line-height: 1.14; letter-spacing: -.04em; color: white; max-width: 14ch; margin-bottom: 24px; }
+.tenant-auth-intro > p { max-width: 37ch; line-height: 1.85; color: #dfebda; }
+.tenant-auth-intro ul { padding-left: 20px; margin: 28px 0 35px; }
+.tenant-auth-intro li { padding-left: 5px; margin: 14px 0; line-height: 1.7; font-size: 1rem; }
+.tenant-auth-intro .tenant-auth-note { border-top: 1px solid #ffffff35; padding-top: 25px; font-size: .9375rem; }
+.tenant-auth-form { padding: 48px; }
+.tenant-auth-form h2 { color: #21372a; font-size: 1.9rem; margin-bottom: 12px; }
+.tenant-auth-form > p { color: #627363; line-height: 1.7; font-size: 1rem; }
+.tenant-auth-form fieldset { border: 0; padding: 0; margin: 28px 0 0; min-width: 0; }
+.tenant-auth-form fieldset .btn { width: 100%; margin-top: 5px; }
+.tenant-auth-form .tenant-auth-switch { margin-top: 26px; }
+.tenant-auth-switch a { color: #164b36; font-weight: 600; text-decoration: underline; text-underline-offset: 4px; }
+.tenant-auth-form > a { display: block; margin-top: 20px; }
+.tenant-demo-credentials { padding: 16px 18px; background: #f0f4ed; border: 1px solid #dbe5da; border-radius: 8px; margin-top: 22px; font-size: .875rem; line-height: 1.8; }
+.tenant-demo-credentials p { margin: 8px 0; }
+.tenant-demo-credentials code { font-size: .875rem; overflow-wrap: anywhere; }
+.tenant-demo-logout { display: block; margin: 22px 12px 0; color: #315c41; font-size: .875rem; }
+.tenant-layout { display: grid; grid-template-columns: 230px minmax(0,1fr); gap: 36px; align-items: start; }
+.tenant-sidebar { padding: 23px 18px; background: #fff; border: 1px solid #dbe5da; border-radius: 14px; position: sticky; top: 112px; }
+.tenant-sidebar > p { margin: 0 12px 16px; font-weight: 650; color: #21372a; }
+.tenant-sidebar nav { display: grid; gap: 5px; }
+.tenant-sidebar nav a { display: block; padding: 13px 12px; border-radius: 7px; color: #536551; font-size: .9375rem; }
+.tenant-sidebar nav a:hover, .tenant-sidebar nav a[aria-current] { background: #e6eedc; color: #164b36; }
+.tenant-catalog-link { display: block; margin: 22px 12px 0; padding-top: 18px; border-top: 1px solid #dbe5da; font-size: .875rem; }
+.tenant-content { min-width: 0; }
+.tenant-content .page-head { padding: 0 0 25px; }
+.tenant-content .page-head h1 { font-size: clamp(1.9rem,3vw,2.5rem); }
+.tenant-panel { padding: 30px; background: #fff; border: 1px solid #dbe5da; border-radius: 14px; margin-bottom: 22px; }
+.tenant-panel h2 { font-size: 1.4rem; color: #21372a; margin: 0 0 13px; font-weight: 600; letter-spacing: -.025em; }
+.tenant-panel p, .tenant-help p { font-size: 1rem; color: #627363; line-height: 1.85; max-width: 65ch; }
+.tenant-panel fieldset { border: 0; padding: 0; margin-top: 22px; min-width: 0; }
+.panel-heading { display: flex; justify-content: space-between; gap: 20px; align-items: start; margin-bottom: 24px; }
+.panel-heading p { margin-bottom: 0; }
+.document-status { display: inline-flex; white-space: nowrap; padding: 7px 11px; font-size: .8125rem; line-height: 1.4; background: #edf1e9; border-radius: 7px; color: #536551; }
+.document-item { display: flex; align-items: center; gap: 20px; padding: 23px 0; border-top: 1px solid #dbe5da; }
+.document-item > div:not(.document-symbol) { flex: 1; min-width: 0; }
+.document-item h3 { margin: 0 0 8px; font-weight: 600; font-size: 1.0625rem; color: #21372a; }
+.document-item p { margin: 0; }
+.document-symbol { width: 52px; height: 62px; flex: 0 0 52px; display: grid; place-items: center; background: #e6eedc; color: #315c41; font-weight: 650; border: 1px solid #ccdcbc; border-radius: 7px 16px 7px 7px; }
+.tenant-panel .document-privacy { padding-top: 16px; border-top: 1px solid #dbe5da; font-size: .875rem; margin-bottom: 0; }
+.tenant-tabs { display: flex; gap: 6px; margin: 0 0 20px; flex-wrap: wrap; }
+.tenant-tabs button { border: 1px solid #dbe5da; background: #fff; color: #536551; padding: 10px 17px; border-radius: 8px; min-height: 44px; font-size: .9375rem; cursor: pointer; }
+.tenant-tabs button.is-selected { color: #fff; background: #164b36; border-color: #164b36; }
+.preview-empty { display: flex; flex-direction: column; align-items: flex-start; padding: 42px 34px; min-height: 260px; justify-content: center; }
+.preview-empty .btn { margin-top: 16px; }
+.empty-symbol { color: #789365; margin-bottom: 20px; }
+.empty-symbol .glyph { width: 36px; height: 36px; }
+.tenant-help { padding: 10px 4px; }
+.tenant-help h3 { font-size: 1.0625rem; font-weight: 600; color: #21372a; }
+.request-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 30px; margin: 25px 0 0; }
+.request-facts dt { color: #647360; font-size: .875rem; margin-bottom: 7px; }
+.request-facts dd { color: #21372a; margin: 0; font-size: 1rem; }
+.survey-property { display: flex; gap: 24px; align-items: center; margin: 24px 0; padding-bottom: 25px; border-bottom: 1px solid #dbe5da; }
+.survey-property img { width: 160px; height: 125px; object-fit: cover; border-radius: 10px; }
+.survey-property h3 { font-size: 1.3rem; color: #21372a; }
+.survey-preview > .btn { margin: 20px 0 12px; }
+.verification-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 24px; }
+.verification-grid h3 { color: #21372a; font-size: 1.125rem; }
+.verification-grid p { line-height: 1.8; font-size: .9375rem; color: #627363; }
+.tenant-panel .btn:disabled, .tenant-auth-form .btn:disabled { background: #e4e8e0; border-color: #d3dccd; color: #647360; opacity: 1; cursor: default; }
+.tenant-auth-form input:disabled, .tenant-panel input:disabled { background: #f5f7f2; color: #647360; opacity: 1; }
+@media (max-width:1100px) {
+  .nav a { padding-inline: 12px; }
+  .tenant-layout { grid-template-columns: 200px minmax(0,1fr); gap: 24px; }
+  .tenant-auth-intro, .tenant-auth-form { padding: 32px; }
+}
+@media (max-width:800px) {
+  .tenant-layout { grid-template-columns: minmax(0,1fr); gap: 25px; }
+  .tenant-sidebar { position: static; padding: 14px; }
+  .tenant-sidebar > p { margin-bottom: 10px; }
+  .tenant-sidebar nav { display: flex; gap: 4px; overflow-x: auto; }
+  .tenant-sidebar nav a { white-space: nowrap; }
+  .tenant-catalog-link { display: none; }
+  .document-item { flex-wrap: wrap; }
+  .document-item > .btn { margin-left: 72px; }
+  .verification-grid { grid-template-columns: 1fr; gap: 14px; }
+}
+@media (max-width:720px) {
+  .request-facts { grid-template-columns: minmax(0,1fr); }
+  .nav .nav-account { margin: 6px 0 0; }
+  .tenant-page, .tenant-auth { padding-top: 22px; padding-bottom: 35px; }
+  .design-notice { font-size: .8125rem; padding: 13px 15px; margin-bottom: 22px; }
+  .tenant-auth-layout { grid-template-columns: minmax(0,1fr); border-radius: 15px; }
+  .tenant-auth-intro, .tenant-auth-form { padding: 28px 24px; }
+  .tenant-auth-intro img { width: 60px; height: 60px; margin-bottom: 23px; border-radius: 10px; }
+  .tenant-auth-intro h1 { max-width: 18ch; font-size: 2rem; }
+  .tenant-auth-intro ul { margin: 20px 0; }
+  .tenant-auth-form h2 { font-size: 1.65rem; }
+  .tenant-panel { padding: 24px 20px; }
+  .panel-heading { flex-wrap: wrap; gap: 14px; }
+  .document-item { gap: 14px; }
+  .document-item > .btn { margin-left: 0; width: 100%; }
+  .survey-property { align-items: flex-start; gap: 15px; }
+  .survey-property img { width: 95px; height: 100px; }
+  .survey-property h3 { font-size: 1.125rem; }
+  .survey-property p { font-size: .875rem; }
+  .tenant-auth-form fieldset .btn { min-height: 48px; }
+}

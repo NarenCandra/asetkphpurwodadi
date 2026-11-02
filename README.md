@@ -89,3 +89,17 @@ Perintah menolak folder tujuan yang sudah ada dan folder dalam direktori data. U
 Ini aplikasi lokal yang dapat dijalankan, bukan klaim siap produksi. Server HTTP bawaan Python ditujukan untuk penggunaan lokal. Peluncuran publik memerlukan server/reverse proxy production, HTTPS, pembatasan unggahan dan request di proxy, konfigurasi host, pemantauan, pencadangan terjadwal dan uji pemulihan, serta peninjauan keamanan. Pembatasan login saat ini di memori proses (10 percobaan/15 menit/IP), sesi bertahan 8 jam, kata sandi di-hash scrypt. Akses tulis membutuhkan sesi dan token CSRF; data internal dikeluarkan dari respons publik. Tidak ada reset kata sandi via email di versi awal.
 
 Foto diperiksa melalui signature dan ukuran, tanpa re-encoding/optimisasi otomatis atau pemindaian file. Foto besar sebaiknya dioptimalkan sebelum unggah. Identitas usaha, nomor kontak, rumah/foto/alamat sebenarnya belum tersedia. Tidak ada pembayaran online maupun integrasi WhatsApp API.
+
+
+## Desain PRD 0.3
+
+Sumber terbaru: `PRD_v0_3.md` (salinan DOCX pengguna). Pengecualian yang dipilih pengguna: objek tetap bangunan dan tanah kosong, beranda tetap hero penuh tanpa pengenalan, cuplikan, dan footer. Arah visual ada di `DESIGN_v0_3.md`.
+
+Layar baru: `/masuk`, `/daftar`, `/akun/profil`, `/akun/pengajuan`, `/akun/pengajuan/pratinjau`, `/akun/sewa`, `/akun/perpanjangan`, dan `/admin/pengajuan`. Semua layar akun dan dokumen baru diberi label pratinjau. Tidak ada login penyewa, unggahan dokumen, nomor referensi, atau konfirmasi pembayaran yang disimulasikan. Katalog tetap terbuka; tombol survei mempertahankan konteks aset menuju rancangan login dan konfirmasi survei. Pengajuan Dipesan tetap nonaktif. Login dan API admin lama tetap berfungsi pada server Python lokal.
+
+Sebelum mengaktifkan alur baru diperlukan backend akun penyewa dan penyimpanan privat, pilihan autentikasi/pemulihan akun, format/batas unggahan, retensi, aturan perpanjangan, serta dua template resmi dari pengelola. Tidak ada template surat atau identitas pribadi fiktif yang dibuat.
+
+
+### Akun demo penyewa
+
+Pada `/masuk`, gunakan username `penyewa.demo` dan kata sandi `DemoPenyewa123!`, atau tombol Isi akun demo. Ini hanya gerbang pratinjau frontend, bukan autentikasi backend. Penanda demo disimpan pada sessionStorage tab (tanpa kata sandi/token), bertahan saat refresh, dan dihapus melalui Keluar akun demo. Tidak memberikan akses dokumen, data admin, atau pengajuan nyata.

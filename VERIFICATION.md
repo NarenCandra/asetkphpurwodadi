@@ -73,3 +73,16 @@ Tidak ada filter kamar tidur atau section publik baru yang ditambahkan. Harga, s
 ### Konsep baru Teras Hijau
 
 Desain aktif menggunakan `terrace.css`: hero split terang, foto dengan sudut melengkung, kartu inset putih dan footer sage. Sudah diperiksa secara visual pada desktop dan ponsel. Beranda, katalog, detail, kontak, dan login diuji pada 320/390/768/1024/1440 px tanpa luapan horizontal. Filter bulanan dan menu mobile berfungsi; tidak ada exception JavaScript selama pemeriksaan. Pemeriksaan sintaks lulus. Preview terbaru: `test-results/terrace-desktop.png` dan `test-results/terrace-mobile.png`.
+
+
+## Desain PRD 0.3 ? 2 November 2026
+
+- Salinan sumber DOCX: PRD_v0_3.md. Cakupan tetap bangunan/tanah dan beranda sebelumnya sesuai jawaban pengguna.
+- Pemeriksaan sintaks seluruh JavaScript frontend dan skrip build, Python, JSON: lulus. 10 tes backend: lulus.
+- Browser lokal: layar masuk, daftar, profil/dokumen, pengajuan, detail pengajuan, sewa, perpanjangan, dan admin pengajuan tanpa error JavaScript. Lebar 320/390/768/1440 px diperiksa; tidak ada overflow halaman.
+- Build statis: tidak memanggil /api; detail aset mempertahankan next menuju masuk, lalu menuju pratinjau konfirmasi survei pada aset yang sama. Tombol penyimpanan nonaktif dan tidak menghasilkan referensi palsu. Tab jenis pengajuan berfungsi.
+- KTP tidak diminta saat daftar; tidak ada file input aktif atau penyimpanan dokumen pada pratinjau. Status dokumen, pengajuan, dan pembayaran terpisah. Tidak ada template surat fiktif.
+- Beranda tetap hero penuh tanpa footer; maksimum lima foto slideshow dipertahankan. Data bangunan dan tanah tidak diubah.
+- Rewrite rute baru ditambahkan untuk Netlify dan Vercel; sintaks TOML/JSON lulus. Deployment eksternal belum dilakukan.
+
+Batas verifikasi: backend akun penyewa, berkas privat, pengajuan nyata, serta perpanjangan belum diimplementasikan; pemeriksaan ini hanya menyatakan kesiapan desain antarmuka dan regresi backend lama.

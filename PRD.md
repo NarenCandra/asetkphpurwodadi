@@ -1,5 +1,3 @@
-> Acuan terbaru untuk rancangan akun dan dokumen: [PRD_v0_3.md](PRD_v0_3.md). Pilihan pengguna 2 November 2026: objek tetap bangunan dan tanah kosong; beranda tetap seperti sekarang. Implementasi modul akun/dokumen pada tahap ini berupa pratinjau desain.
-
 # Acuan produk
 
 ## Revisi kebutuhan yang disetujui 1 November 2026

@@ -27,23 +27,3 @@
   from = "/admin/*"
   to = "/index.html"
   status = 200
-
-[[redirects]]
-  from = "/masuk"
-  to = "/index.html"
-  status = 200
-
-[[redirects]]
-  from = "/daftar"
-  to = "/index.html"
-  status = 200
-
-[[redirects]]
-  from = "/akun"
-  to = "/index.html"
-  status = 200
-
-[[redirects]]
-  from = "/akun/*"
-  to = "/index.html"
-  status = 200

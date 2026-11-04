@@ -58,7 +58,7 @@ Foto pertama menjadi foto utama. Tombol Kiri/Kanan mengurutkan; Jadikan utama me
 
 - Slider memakai batas semua rumah publik pada periode terpilih, tanpa dipersempit kawasan. Langkah Rp1; jika hanya satu harga, slider dikunci pada harga tersebut. Rentang inklusif, titik tidak dapat saling melewati. Slider dan urutan harga nonaktif sebelum periode dipilih; periode berubah mereset keduanya. Tersedia selalu mendahului Dipesan, lalu harga diurutkan dalam setiap kelompok.
 - Tautan langsung rumah Draft/Tersewa menghasilkan API 404, halaman netral “Properti tidak tersedia”, dan akses foto ditolak bagi publik.
-- Publikasi mensyaratkan nama/kode unik, deskripsi, kawasan, alamat, Google Maps HTTPS, luas dan jumlah kamar positif, foto, serta penawaran valid. Harga dan minimum sewa bilangan bulat positif. Tahun tidak dihitung dari bulan.
+- Publikasi (status Tersedia) hanya mensyaratkan nama dan kode unik. Foto, Google Maps, luas, deskripsi, dan harga boleh kosong dan tampil sebagai belum diisi / harga dibahas dengan pengelola. Jika harga diisi, harus bilangan bulat positif.
 - Transisi status mengikuti PRD; tindakan tarik ke Draft tersedia. Perubahan status memerlukan dialog dan konfirmasi pada server. Dipesan memerlukan verifikasi DP manual; Tersewa memerlukan verifikasi pelunasan dan periode/tanggal aktif.
 - Penanda menggunakan tanggal kalender operasional. Tidak ada penjadwalan, perubahan status, perpanjangan atau publikasi otomatis.
 - WhatsApp hanya membuka percakapan, membawa nama/kode/tautan rumah, dan tidak mencatat transaksi atau survei terkonfirmasi.
@@ -73,6 +73,34 @@ python -m unittest discover -s tests -v
 Alias: `npm.cmd run build`, `npm.cmd run lint`, `npm.cmd test`. Aplikasi buildless: `build` memeriksa sintaks Python/JavaScript, JSON, dan whitespace; tidak menghasilkan bundle. Lint ini pemeriksaan ringan, bukan pemeriksaan tipe atau linter semantik penuh.
 
 Pengujian backend menggunakan database/foto sementara, bukan data aplikasi. Meliputi sesi, CSRF, akses tanpa login, kebocoran properti/foto/tanggal internal, validasi, transisi status, tanggal sewa, penanda batas 7/30 hari, konflik edit, unggah/hapus/urut foto, dan logout.
+
+## Akun penyewa, pengajuan, dan berkas (PRD v0.3)
+
+Alur penyewa: katalog -> **Jadwalkan Survei via WhatsApp** (wajib login/daftar, nomor referensi `PGJ-tahun-nnnnn` disimpan sebelum WhatsApp terbuka) -> bila deal, **Ajukan Kerja Sama** -> unggah KTP (dipakai ulang) -> unduh Surat Permohonan siap tanda tangan, tanda tangan di luar web, unggah hasilnya -> admin verifikasi di dashboard -> pembayaran lewat WhatsApp -> admin konfirmasi DP/pelunasan dan mengaktifkan sewa -> **Sewa Saya** menampilkan periode aktif dan tombol **Ajukan Perpanjangan**.
+
+- Halaman penyewa: `/daftar`, `/masuk`, `/akun` (Pengajuan Saya, Sewa Saya, Dokumen Saya), `/akun/pengajuan/<id>`.
+- Halaman admin tambahan: `/admin/pengajuan` (daftar, filter, verifikasi KTP/surat, status, pembayaran, aktivasi sewa, perpanjangan) dan `/admin/impor` (impor Excel).
+- Berkas penyewa disimpan privat di `data/private/` dan hanya dapat diunduh lewat endpoint yang memeriksa pemilik atau admin. PDF/JPG/PNG maksimal 5 MB, setiap unggahan menjadi versi baru.
+- Dokumen Diterima/Terverifikasi tidak otomatis menyetujui pengajuan atau melunasi pembayaran; semuanya dicatat manual oleh admin.
+- Impor Excel: format Daftar Potensi Optimalisasi Aset (sheet `Purwodadi`). Baris menjadi Draft bertipe Bangunan (atau langsung Tersedia untuk yang belum tersewa bila opsi tayangkan dicentang) dengan kode `PWD-001`, ... Untuk bentuk kerja sama sewa 1 th, harga sewa tahunan (minimum 1 tahun) diisi dari Estimasi 2026 dan diberi catatan internal. Kolom Excel yang kosong (Objek/Lokasi/No. Inventaris) diberi catatan agar dilengkapi sebelum publikasi. Satu No. Inventaris boleh muncul di banyak baris. Impor ulang file yang sama tidak menggandakan data dan, bila opsi tayangkan dicentang, ikut menayangkan Draft hasil impor sebelumnya yang belum tersewa.
+- Data internal Perhutani (No. Inventaris, Alas Hak, Bentuk Kerja Sama, Real 2025, Estimasi 2026, Real 2026, Rencana 2027, Keterangan) hanya tampil di admin.
+- Tes tambahan: `python -m unittest tests.test_tenant -v`.
+
+Catatan penyimpanan: versi ini memakai SQLite dan folder `data/` (lihat README di atas). Migrasi ke Supabase belum dikerjakan; `supabase_schema.sql` hanya rancangan awal dan belum dipakai kode.
+
+## Pengujian otomatis (Vitest + Playwright)
+
+Pertama kali: `npm install` lalu `npx playwright install chromium`. Python tetap dibutuhkan karena server uji memakai backend asli.
+
+| Perintah | Isi |
+| --- | --- |
+| `npm run test:unit` | Vitest: helper frontend (`esc`, `waLink`, `dateId`, `chip`, `readFile`) dan kecocokan status/label dengan `tenant.py`. |
+| `npm run test:e2e` | Playwright: daftar, survei, KTP, kerja sama, admin menyiapkan surat, penyewa mengunggah, penolakan persetujuan, akses tanpa login, dan tampilan mobile. |
+| `npm run test:e2e:ui` | Playwright dalam mode interaktif. |
+| `npm test` | Pengujian backend Python (unittest). |
+| `npm run test:all` | Ketiganya berurutan. |
+
+Tes E2E menjalankan `tests/e2e_server.py` sendiri: database sementara, data contoh, dan akun admin uji (`e2e-admin`), port 8765. Data aplikasimu di `data/` tidak tersentuh. Ubah port dengan `E2E_PORT=9000`. Bila perintah Python di komputermu bukan `python`, set `E2E_PYTHON=py` (atau `python3`).
 
 ## Cadangan dan pemulihan lokal
 
@@ -89,17 +117,3 @@ Perintah menolak folder tujuan yang sudah ada dan folder dalam direktori data. U
 Ini aplikasi lokal yang dapat dijalankan, bukan klaim siap produksi. Server HTTP bawaan Python ditujukan untuk penggunaan lokal. Peluncuran publik memerlukan server/reverse proxy production, HTTPS, pembatasan unggahan dan request di proxy, konfigurasi host, pemantauan, pencadangan terjadwal dan uji pemulihan, serta peninjauan keamanan. Pembatasan login saat ini di memori proses (10 percobaan/15 menit/IP), sesi bertahan 8 jam, kata sandi di-hash scrypt. Akses tulis membutuhkan sesi dan token CSRF; data internal dikeluarkan dari respons publik. Tidak ada reset kata sandi via email di versi awal.
 
 Foto diperiksa melalui signature dan ukuran, tanpa re-encoding/optimisasi otomatis atau pemindaian file. Foto besar sebaiknya dioptimalkan sebelum unggah. Identitas usaha, nomor kontak, rumah/foto/alamat sebenarnya belum tersedia. Tidak ada pembayaran online maupun integrasi WhatsApp API.
-
-
-## Desain PRD 0.3
-
-Sumber terbaru: `PRD_v0_3.md` (salinan DOCX pengguna). Pengecualian yang dipilih pengguna: objek tetap bangunan dan tanah kosong, beranda tetap hero penuh tanpa pengenalan, cuplikan, dan footer. Arah visual ada di `DESIGN_v0_3.md`.
-
-Layar baru: `/masuk`, `/daftar`, `/akun/profil`, `/akun/pengajuan`, `/akun/pengajuan/pratinjau`, `/akun/sewa`, `/akun/perpanjangan`, dan `/admin/pengajuan`. Semua layar akun dan dokumen baru diberi label pratinjau. Tidak ada login penyewa, unggahan dokumen, nomor referensi, atau konfirmasi pembayaran yang disimulasikan. Katalog tetap terbuka; tombol survei mempertahankan konteks aset menuju rancangan login dan konfirmasi survei. Pengajuan Dipesan tetap nonaktif. Login dan API admin lama tetap berfungsi pada server Python lokal.
-
-Sebelum mengaktifkan alur baru diperlukan backend akun penyewa dan penyimpanan privat, pilihan autentikasi/pemulihan akun, format/batas unggahan, retensi, aturan perpanjangan, serta dua template resmi dari pengelola. Tidak ada template surat atau identitas pribadi fiktif yang dibuat.
-
-
-### Akun demo penyewa
-
-Pada `/masuk`, gunakan username `penyewa.demo` dan kata sandi `DemoPenyewa123!`, atau tombol Isi akun demo. Ini hanya gerbang pratinjau frontend, bukan autentikasi backend. Penanda demo disimpan pada sessionStorage tab (tanpa kata sandi/token), bertahan saat refresh, dan dihapus melalui Keluar akun demo. Tidak memberikan akses dokumen, data admin, atau pengajuan nyata.

@@ -6,4 +6,5 @@ test-results/
 .playwright-mcp/
 backups/
 dist/
-
+node_modules/
+playwright-report/

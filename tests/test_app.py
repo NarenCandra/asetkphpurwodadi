@@ -46,10 +46,13 @@ class RentalTests(unittest.TestCase):
         self.assertEqual(result['access'], 'Jalan lingkungan')
         with self.assertRaises(ValueError):
             app.validate_house(dict(building, asset_type='invalid'), photo_count=1)
+        # Aset boleh tayang walau luas, foto, Maps, dan harga belum lengkap.
+        minimal = {'name': 'Aset minimal', 'code': 'MIN-1', 'status': 'Tersedia', 'confirm_status': True}
+        self.assertEqual(app.validate_house(minimal, photo_count=0)['status'], 'Tersedia')
         with self.assertRaises(ValueError):
-            app.validate_house(dict(building, building_size=0), photo_count=1)
+            app.validate_house(dict(minimal, name=''))
         with self.assertRaises(ValueError):
-            app.validate_house(dict(land, land_size=0), photo_count=1)
+            app.validate_house(dict(building, monthly={'price': -5, 'minimum': 1}))
 
     @classmethod
     def setUpClass(cls):
@@ -140,7 +143,10 @@ class RentalTests(unittest.TestCase):
         self.login()
         house = self.draft()
         house.update(status='Tersedia', confirm_status=True)
-        self.save(house, 400)
+        house = self.save(house)  # tayang tanpa foto/harga/luas diperbolehkan
+        self.assertEqual(self.request('/api/houses/'+house['id'])[0], 200)
+        house.update(status='Draft', confirm_status=True)
+        house = self.save(house)
         # Valid 1x1 PNG, persisted and accessed through the authorization-aware media route.
         png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII='
         endpoint = '/api/admin/houses/'+house['id']
@@ -178,11 +184,9 @@ class RentalTests(unittest.TestCase):
         public = self.request('/api/houses/'+house['id'])[1]
         self.assertNotIn('lease_end', public)
         self.assertEqual(self.request(endpoint+'/photos', 'DELETE', {'photo_id': photos[0]['id']}, True)[0], 200)
-        self.assertEqual(self.request(endpoint+'/photos', 'DELETE', {'photo_id': photos[1]['id']}, True)[0], 400)
-        house = self.request(endpoint, auth=True)[1]
-        house.update(status='Draft', confirm_status=True)
-        self.save(house)
+        # Foto tidak lagi wajib: foto terakhir boleh dihapus walau aset sudah tayang.
         self.assertEqual(self.request(endpoint+'/photos', 'DELETE', {'photo_id': photos[1]['id']}, True)[0], 200)
+        self.assertEqual(self.request(endpoint, auth=True)[1]['photos'], [])
 
     def test_lease_notice_boundaries(self):
         current = date(2026, 10, 30)

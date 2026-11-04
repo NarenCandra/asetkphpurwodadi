@@ -6,11 +6,13 @@ from datetime import timedelta
 import app
 
 
-def seed_demo():
+def seed_demo(append=False):
     app.init_db()
     with app.connect() as db:
-        if db.execute('SELECT COUNT(*) FROM houses').fetchone()[0]:
-            raise SystemExit('Database tidak kosong. Seed dibatalkan agar data Anda tidak tertimpa.')
+        if append and db.execute("SELECT COUNT(*) FROM houses WHERE code LIKE 'DEMO-%'").fetchone()[0]:
+            raise SystemExit('Data contoh sudah pernah ditambahkan.')
+        if not append and db.execute('SELECT COUNT(*) FROM houses').fetchone()[0]:
+            raise SystemExit('Database tidak kosong. Gunakan: python app.py seed-demo --append untuk menambahkan data contoh di samping data Anda.')
         records = json.loads((app.ROOT / 'demo' / 'houses.json').read_text(encoding='utf-8'))
         for index, house in enumerate(records):
             identifier = secrets.token_hex(12)

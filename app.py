@@ -12,6 +12,7 @@ import re
 import secrets
 import shutil
 import sqlite3
+import sys
 import threading
 import time
 from datetime import date, datetime, timezone, timedelta
@@ -20,6 +21,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+import tenant
 
 ROOT = Path(__file__).resolve().parent
 for line in (ROOT / '.env').read_text(encoding='utf-8').splitlines() if (ROOT / '.env').exists() else []:
@@ -61,6 +64,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS houses (id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE COLLATE NOCASE, body TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1);
         CREATE TABLE IF NOT EXISTS photos (id TEXT PRIMARY KEY, house_id TEXT NOT NULL REFERENCES houses(id) ON DELETE CASCADE, filename TEXT NOT NULL, position INTEGER NOT NULL);
         ''')
+        tenant.init(db)
 
 
 def password_hash(password, salt):
@@ -110,7 +114,7 @@ def house_record(db, row, admin=False):
     if admin:
         house['notice'] = lease_notice(house)
     else:
-        for key in ('lease_period', 'lease_start', 'lease_end', 'internal_notes', 'inventory_number', 'asset_condition', 'legal_basis', 'cooperation_type'):
+        for key in tenant.INTERNAL_KEYS:
             house.pop(key, None)
     return house
 
@@ -122,11 +126,21 @@ def validate_house(body, previous=None, photo_count=0):
     result['asset_type'] = body.get('asset_type', (previous or {}).get('asset_type', 'building'))
     if result['asset_type'] not in ('building', 'land'):
         raise ValueError('Jenis aset tidak valid.')
-    for key in ('name', 'code', 'description', 'area', 'address', 'maps_url', 'terms', 'extra_costs', 'internal_notes', 'lease_period', 'lease_start', 'lease_end', 'access', 'land_condition', 'inventory_number', 'asset_condition', 'legal_basis', 'cooperation_type'):
+    for key in ('name', 'code', 'description', 'area', 'address', 'maps_url', 'terms', 'extra_costs', 'internal_notes', 'lease_period', 'lease_start', 'lease_end', 'access', 'land_condition', 'inventory_number', 'asset_condition', 'legal_basis', 'cooperation_type', 'keterangan'):
         value = body.get(key, '')
         if not isinstance(value, str) or len(value) > 10000:
             raise ValueError('Isian teks tidak valid: ' + key)
         result[key] = value.strip()
+    for key in ('real_2025', 'estimasi_2026', 'real_2026', 'rencana_2027'):
+        value = body.get(key, (previous or {}).get(key))
+        if value in (None, ''):
+            result[key] = None
+        elif isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0 or value > 1000000000000 or int(value) != value:
+            raise ValueError('Nilai rupiah tidak valid: ' + key)
+        else:
+            result[key] = int(value)
+    if previous and previous.get('import_key'):
+        result['import_key'] = previous['import_key']
     if result['cooperation_type'] not in ('', 'Sewa 1 tahun', 'Sharing', 'Franchise'):
         raise ValueError('Bentuk kerja tidak valid.')
     if not result['name'] or not result['code']:
@@ -171,10 +185,6 @@ def validate_house(body, previous=None, photo_count=0):
         if body.get('confirm_status') is not True:
             raise ValueError('Konfirmasi perubahan status diperlukan.')
     result['status'] = status
-    if status != 'Draft':
-        required_sizes = ('land_size', 'building_size') if result['asset_type'] == 'building' else ('land_size',)
-        if any(not result[k] for k in ('area', 'address', 'description', 'maps_url')) or any(result[k] <= 0 for k in required_sizes) or photo_count < 1 or not (result['monthly'] or result['yearly']):
-            raise ValueError('Lengkapi lokasi, deskripsi, Google Maps, spesifikasi, minimal satu foto dan satu penawaran sebelum publikasi.')
     if status == 'Tersewa':
         period = result['lease_period']
         if period not in ('monthly', 'yearly') or not result[period]:
@@ -252,6 +262,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urlparse(self.path).path
         try:
+            if tenant.dispatch(sys.modules[__name__], self, 'GET', path):
+                return
             if path == '/api/config':
                 return self.send(200, config())
             if path == '/api/session':
@@ -309,6 +321,8 @@ class Handler(BaseHTTPRequestHandler):
         if origin and urlparse(origin).netloc != self.headers.get('Host'):
             return self.send(403, {'error': 'Asal permintaan tidak diizinkan.'})
         try:
+            if tenant.dispatch(sys.modules[__name__], self, method, path):
+                return
             if path == '/api/login' and method == 'POST':
                 return self.login(self.json_body(10000))
             session = self.session()
@@ -364,8 +378,6 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send(201, {'ok': True})
                 if action == '/photos' and method == 'DELETE':
                     photos = db.execute('SELECT * FROM photos WHERE house_id=?', (identifier,)).fetchall()
-                    if len(photos) <= 1 and json.loads(row['body'])['status'] != 'Draft':
-                        raise ValueError('Rumah yang dipublikasikan harus memiliki setidaknya satu foto. Tarik ke Draft terlebih dahulu.')
                     photo = next((p for p in photos if p['id'] == body.get('photo_id')), None)
                     if not photo:
                         raise ValueError('Foto tidak ditemukan.')
@@ -423,6 +435,7 @@ def main():
     parser.add_argument('--port', type=int, default=int(os.environ.get('PORT', 8000)))
     parser.add_argument('--host', default='127.0.0.1')
     parser.add_argument('--output', help='Folder cadangan baru')
+    parser.add_argument('--append', action='store_true', help='seed-demo: tambahkan contoh tanpa menghapus data yang ada')
     args = parser.parse_args()
     init_db()
     if args.command == 'init':
@@ -440,7 +453,7 @@ def main():
         print('Akun admin berhasil dibuat.')
     elif args.command == 'seed-demo':
         from seed import seed_demo
-        seed_demo()
+        seed_demo(args.append)
     elif args.command == 'backup':
         if not args.output:
             raise SystemExit('Gunakan --output dengan folder cadangan baru. Hentikan server terlebih dahulu.')

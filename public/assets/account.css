@@ -1,0 +1,8 @@
+/* Tambahan untuk akun penyewa dan halaman pengajuan */
+.steps { padding-left: 1.25rem; display: grid; gap: 1rem; }
+.steps li { padding-bottom: .75rem; border-bottom: 1px solid rgba(23, 78, 60, .15); }
+.steps li:last-child { border-bottom: 0; }
+.confirm-modal .admin-actions { flex-wrap: wrap; gap: .5rem; }
+.admin-section details { margin: .5rem 0; }
+.admin-section h3 { margin-top: 1.25rem; }
+#survey-btn, #coop-btn { width: 100%; margin-top: .5rem; text-align: center; }

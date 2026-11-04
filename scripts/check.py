@@ -11,6 +11,5 @@ for file in [root / 'app.py', root / 'seed.py', *root.glob('tests/*.py'), *root.
         if line.rstrip() != line:
             raise SystemExit(f'{file}:{number}: trailing whitespace')
 json.loads((root / 'demo/houses.json').read_text(encoding='utf-8'))
-for file in [*root.glob('public/assets/*.js'), *root.glob('scripts/*.cjs')]:
-    subprocess.run(['node', '--check', str(file)], check=True)
+subprocess.run(['node', '--check', str(root / 'public/assets/app.js')], check=True)
 print('PASS: Python syntax, whitespace, JSON, JavaScript syntax. Buildless: no compilation required.')

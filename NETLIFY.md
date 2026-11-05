@@ -7,6 +7,12 @@ termasuk hash kata sandi scrypt, cookie sesi HttpOnly, dan token CSRF.
 Akun admin dan penyewa yang sudah ada tetap dipakai. Ini tidak memakai
 Supabase Auth, dan tidak perlu menjalankan `supabase_schema.sql`.
 
+Untuk pengajuan sewa baru dan perpanjangan, konfirmasi pembayaran **Lunas**
+otomatis menyimpan status pengajuan **Selesai**. KTP tetap harus terverifikasi
+dan surat bertanda tangan harus diterima sebelum persetujuan/pelunasan.
+Pencatatan tanggal aktivasi atau perpanjangan tetap dilakukan admin sesudahnya;
+status Selesai tidak mengisi tanggal sewa atau menutup akses pencatatan periode.
+
 ## Pengaturan satu kali
 
 1. Di Supabase buka project **sewaasetkph > Connect > Transaction pooler**.

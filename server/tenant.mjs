@@ -29,7 +29,7 @@ async function progress(c,a) {
   if (['ditolak','dibatalkan'].includes(a.status)) return [0,a.status === 'dibatalkan' ? 'Pengajuan ditutup.' : 'Pengajuan ditolak. Lihat catatan pengelola.'];
   if (a.kind === 'survei') return [{diproses:2,terjadwal:3,selesai:3}[a.status] || 2, {diproses:'Lanjutkan ke WhatsApp dengan nomor referensi untuk menyepakati jadwal survei.',terjadwal:'Survei sudah dijadwalkan pengelola. Jika setelah survei Anda sepakat, lanjutkan ke permohonan sewa.',selesai:'Survei selesai. Jika sepakat, lanjutkan ke permohonan sewa.'}[a.status] || ''];
   if (a.applied) return [4,'Sewa aktif. Lihat periode di Sewa Saya.'];
-  if (a.status === 'disetujui') return [3,a.payment === 'lunas' ? 'Pelunasan dikonfirmasi. Menunggu pengelola mencatat sewa.' : a.payment === 'dp' ? 'DP dikonfirmasi. Lanjutkan pelunasan melalui WhatsApp.' : 'Disetujui. Lanjutkan ke WhatsApp untuk pembayaran.'];
+  if (['disetujui','selesai'].includes(a.status)) return [3,a.payment === 'lunas' ? 'Pengajuan selesai dan pelunasan dikonfirmasi. Menunggu pengelola mencatat periode sewa.' : a.payment === 'dp' ? 'DP dikonfirmasi. Lanjutkan pelunasan melalui WhatsApp.' : 'Disetujui. Lanjutkan ke WhatsApp untuk pembayaran.'];
   const ktp = a.ktp_doc_id ? await c.one('SELECT * FROM documents WHERE id=$1',[a.ktp_doc_id]) : null;
   if (ktp?.status === 'perlu_perbaikan') return [1,'Perbaiki KTP: '+(ktp.reason || 'lihat catatan pengelola')+'.'];
   if (a.status === 'perlu_perbaikan') return [1,'Perbaiki berkas: '+(a.admin_note || 'lihat catatan pengelola')+'.'];
@@ -101,20 +101,22 @@ async function adminUpdate(c,a,body) {
   const status = body.status ?? a.status, payment = body.payment ?? a.payment, note = body.admin_note ?? a.admin_note, pnote = body.payment_note ?? a.payment_note;
   check(['diproses','terjadwal','selesai','perlu_perbaikan','disetujui','ditolak','dibatalkan'].includes(status) && ['belum','dp','lunas'].includes(payment) && typeof note === 'string' && typeof pnote === 'string' && note.length <= 2000 && pnote.length <= 2000,'Data pengajuan tidak valid.');
   check(!a.applied,'Pengajuan ini sudah diaktifkan menjadi sewa dan tidak dapat diubah.');
-  check(a.kind === 'survei' ? !['perlu_perbaikan','disetujui'].includes(status) && payment === 'belum' : !['terjadwal','selesai'].includes(status),'Status tidak sesuai dengan jenis pengajuan.');
+  check(a.kind === 'survei' ? !['perlu_perbaikan','disetujui'].includes(status) && payment === 'belum' : status !== 'terjadwal','Status tidak sesuai dengan jenis pengajuan.');
+  check(a.kind === 'survei' || status !== 'selesai' || payment === 'lunas','Status Selesai memerlukan pelunasan yang dikonfirmasi.');
   check(status !== 'perlu_perbaikan' || note.trim(),'Tuliskan alasan perbaikan pada catatan admin.');
-  if (status === 'disetujui' && a.status !== 'disetujui') {
+  if (a.kind !== 'survei' && ['disetujui','selesai'].includes(status) && !['disetujui','selesai'].includes(a.status)) {
     const ktp = await c.one('SELECT * FROM documents WHERE id=$1',[a.ktp_doc_id]);
     check(ktp?.status === 'terverifikasi','KTP harus terverifikasi sebelum pengajuan disetujui.');
     check((await latest(c,a.user_id,'surat_ttd',a.id))?.status === 'diterima','Surat bertanda tangan harus berstatus Diterima sebelum pengajuan disetujui.');
   }
-  check(payment === 'belum' || status === 'disetujui','Pembayaran hanya dapat dikonfirmasi setelah pengajuan disetujui.');
+  check(payment === 'belum' || ['disetujui','selesai'].includes(status),'Pembayaran hanya dapat dikonfirmasi setelah pengajuan disetujui.');
   if (a.kind === 'sewa_baru' && payment !== 'belum' && payment !== a.payment) check(!await c.one("SELECT 1 FROM applications WHERE house_id=$1 AND id!=$2 AND kind='sewa_baru' AND closed=0 AND payment IN ('dp','lunas')",[a.house_id,a.id]),'Aset ini sudah ditahan oleh pengajuan lain.');
-  await c.q('UPDATE applications SET status=$1,admin_note=$2,payment=$3,payment_note=$4,closed=$5,updated=$6 WHERE id=$7',[status,note.trim(),payment,pnote.trim(),['ditolak','dibatalkan'].includes(status)?1:0,now(),a.id]);
+  const finalStatus = a.kind !== 'survei' && payment === 'lunas' ? 'selesai' : status;
+  await c.q('UPDATE applications SET status=$1,admin_note=$2,payment=$3,payment_note=$4,closed=$5,updated=$6 WHERE id=$7',[finalStatus,note.trim(),payment,pnote.trim(),['ditolak','dibatalkan'].includes(status)?1:0,now(),a.id]);
   return json({ok:true});
 }
 async function activate(c,a,body,extend=false) {
-  check(a.kind === (extend?'perpanjangan':'sewa_baru') && a.status === 'disetujui' && a.payment === 'lunas' && !a.closed && !a.applied,'Sewa hanya dapat dicatat dari pengajuan yang disetujui dan pelunasannya sudah dikonfirmasi.');
+  check(a.kind === (extend?'perpanjangan':'sewa_baru') && ['disetujui','selesai'].includes(a.status) && a.payment === 'lunas' && !a.closed && !a.applied,'Sewa hanya dapat dicatat dari pengajuan yang disetujui dan pelunasannya sudah dikonfirmasi.');
   check(body.confirm === true,'Konfirmasi aktivasi atau perpanjangan diperlukan.');
   const house = await houseBrief(c,a.house_id);
   let last = null;

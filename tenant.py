@@ -192,9 +192,9 @@ def progress(db, row):
         return {'diproses': 2, 'terjadwal': 3, 'selesai': 3}.get(status, 2), text.get(status, '')
     if row['applied']:
         return 4, 'Sewa aktif. Lihat periode di Sewa Saya.'
-    if status == 'disetujui':
+    if status in ('disetujui', 'selesai'):
         if row['payment'] == 'lunas':
-            return 3, 'Pelunasan dikonfirmasi. Menunggu pengelola mengaktifkan sewa.' if kind == 'sewa_baru' else 'Pelunasan dikonfirmasi. Menunggu pengelola mencatat perpanjangan.'
+            return 3, 'Pengajuan selesai dan pelunasan dikonfirmasi. Menunggu pengelola mencatat periode sewa.'
         if row['payment'] == 'dp':
             return 3, 'DP dikonfirmasi. Lanjutkan pelunasan melalui WhatsApp.'
         return 3, 'Disetujui. Lanjutkan ke WhatsApp untuk pembayaran.'
@@ -311,26 +311,30 @@ def admin_update_application(A, db, row, body):
     kind = row['kind']
     if row['applied']:
         raise ValueError('Pengajuan ini sudah diaktifkan menjadi sewa dan tidak dapat diubah.')
-    if (kind != 'survei' and status in SURVEY_ONLY) or (kind == 'survei' and status in FORM_ONLY):
+    if (kind != 'survei' and status == 'terjadwal') or (kind == 'survei' and status in FORM_ONLY):
         raise ValueError('Status tidak sesuai dengan jenis pengajuan.')
+    if kind != 'survei' and status == 'selesai' and payment != 'lunas':
+        raise ValueError('Status Selesai memerlukan pelunasan yang dikonfirmasi.')
     if kind == 'survei' and (payment != 'belum'):
         raise ValueError('Pembayaran tidak berlaku untuk survei.')
     if status == 'perlu_perbaikan' and not note.strip():
         raise ValueError('Tuliskan alasan perbaikan pada catatan admin.')
-    if status == 'disetujui' and row['status'] != 'disetujui':
+    if kind != 'survei' and status in ('disetujui', 'selesai') and row['status'] not in ('disetujui', 'selesai'):
         ktp = db.execute('SELECT * FROM documents WHERE id=?', (row['ktp_doc_id'],)).fetchone()
         surat = latest(db, row['user_id'], 'surat_ttd', row['id'])
         if not ktp or ktp['status'] != 'terverifikasi':
             raise ValueError('KTP harus terverifikasi sebelum pengajuan disetujui.')
         if not surat or surat['status'] != 'diterima':
             raise ValueError('Surat bertanda tangan harus berstatus Diterima sebelum pengajuan disetujui.')
-    if payment != 'belum' and status != 'disetujui':
+    if payment != 'belum' and status not in ('disetujui', 'selesai'):
         raise ValueError('Pembayaran hanya dapat dikonfirmasi setelah pengajuan disetujui.')
     if payment in ('dp', 'lunas') and payment != row['payment']:
         clash = db.execute("SELECT ref FROM applications WHERE house_id=? AND id!=? AND kind='sewa_baru' AND closed=0 AND payment IN ('dp','lunas')", (row['house_id'], row['id'])).fetchone()
         if kind == 'sewa_baru' and clash:
             raise ValueError(f"Aset ini sudah ditahan oleh pengajuan lain ({clash['ref']}).")
     closed = 1 if status in ('ditolak', 'dibatalkan') else 0
+    if kind != 'survei' and payment == 'lunas':
+        status = 'selesai'
     db.execute('UPDATE applications SET status=?,admin_note=?,payment=?,payment_note=?,closed=?,updated=? WHERE id=?', (status, note.strip(), payment, pnote.strip(), closed, now(), row['id']))
 
 
@@ -356,7 +360,7 @@ def iso(value, label):
 
 
 def activate(A, db, row, body):
-    if row['kind'] != 'sewa_baru' or row['status'] != 'disetujui' or row['payment'] != 'lunas' or row['closed'] or row['applied']:
+    if row['kind'] != 'sewa_baru' or row['status'] not in ('disetujui', 'selesai') or row['payment'] != 'lunas' or row['closed'] or row['applied']:
         raise ValueError('Sewa hanya dapat diaktifkan dari pengajuan sewa baru yang disetujui dan pelunasannya sudah dikonfirmasi.')
     if body.get('confirm') is not True:
         raise ValueError('Konfirmasi aktivasi sewa diperlukan.')
@@ -378,7 +382,7 @@ def activate(A, db, row, body):
 
 
 def extend(A, db, row, body):
-    if row['kind'] != 'perpanjangan' or row['status'] != 'disetujui' or row['payment'] != 'lunas' or row['closed'] or row['applied'] or not row['lease_id']:
+    if row['kind'] != 'perpanjangan' or row['status'] not in ('disetujui', 'selesai') or row['payment'] != 'lunas' or row['closed'] or row['applied'] or not row['lease_id']:
         raise ValueError('Perpanjangan hanya dapat dicatat dari pengajuan perpanjangan yang disetujui dan pelunasannya sudah dikonfirmasi.')
     if body.get('confirm') is not True:
         raise ValueError('Konfirmasi perpanjangan diperlukan.')

@@ -1,0 +1,2 @@
+# Hanya dibutuhkan bila memakai Supabase (DATABASE_URL diisi). Mode lokal SQLite tidak memerlukan paket apa pun.
+psycopg[binary]>=3.1,<4

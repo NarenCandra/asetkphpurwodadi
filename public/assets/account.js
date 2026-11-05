@@ -53,18 +53,23 @@ const Account = {
     if (path === '/akun' || path.startsWith('/akun/')) {
       if (window.SEWARUMA_STATIC_DEMO) return false;
       if (!state.user?.authenticated) { navigate('/masuk?next=' + encodeURIComponent(path)); return true; }
-      if (path === '/akun') { const data = await Account.load(); if (id === navigationId) Account.home(data); return true; }
+      if (path === '/akun') { navigate('/akun/pengajuan'); return true; }
+      const tab = path.match(/^\/akun\/(pengajuan|sewa|profil)$/);
+      if (tab) { const data = await Account.load(); if (id === navigationId) Account['page_' + tab[1]](data); return true; }
       const match = path.match(/^\/akun\/pengajuan\/([a-f0-9]+)$/);
       if (match) { const application = await api('/api/my/applications/' + match[1]); if (id === navigationId) Account.applicationPage(application); return true; }
       return false;
     }
-    if (/^\/admin\/(pengajuan|impor)/.test(path)) {
+    if (/^\/admin\/(pengajuan|impor|penyewa)/.test(path)) {
       if (window.SEWARUMA_STATIC_DEMO) return false;
       state.session = await api('/api/session');
       if (id !== navigationId) return true;
       if (!state.session.authenticated) { login(); return true; }
       if (path === '/admin/impor') { Account.importPage(); return true; }
       if (path === '/admin/pengajuan') { Account.adminList(); return true; }
+      if (path === '/admin/penyewa') { Account.tenantList(); return true; }
+      const tenantMatch = path.match(/^\/admin\/penyewa\/([a-f0-9]+)$/);
+      if (tenantMatch) { const tenant = await api('/api/admin/tenants/' + tenantMatch[1]); if (id === navigationId) Account.tenantDetail(tenant); return true; }
       const match = path.match(/^\/admin\/pengajuan\/([a-f0-9]+)$/);
       if (match) { const application = await api('/api/admin/applications/' + match[1]); if (id === navigationId) Account.adminDetail(application); return true; }
     }
@@ -78,19 +83,20 @@ const Account = {
 
   // ---------------------------------------------------------- daftar / masuk
   authPage(register) {
-    const next = new URLSearchParams(location.search).get('next') || '/akun';
-    const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '/akun';
-    shell(`<div class="login-wrap"><h1>${register ? 'Daftar Akun Penyewa' : 'Masuk Penyewa'}</h1><p class="muted">${register ? 'Akun diperlukan untuk mengajukan survei dan permohonan sewa. KTP tidak diminta saat mendaftar.' : 'Masuk untuk mengajukan survei, mengunggah berkas, dan melihat status sewa Anda.'}</p><form class="login-form" id="auth-form"><div class="error form-error" id="auth-error" role="alert"></div>${register ? '<div class="field"><label for="name">Nama lengkap</label><input id="name" autocomplete="name" required></div><div class="field"><label for="whatsapp">Nomor WhatsApp</label><input id="whatsapp" type="tel" inputmode="tel" autocomplete="tel" placeholder="0812xxxxxxxx" required></div>' : ''}<div class="field"><label for="email">Email</label><input id="email" type="email" autocomplete="email" required></div><div class="field"><label for="password">Kata sandi${register ? ' (minimal 8 karakter)' : ''}</label><input id="password" type="password" autocomplete="${register ? 'new-password' : 'current-password'}" minlength="${register ? 8 : 1}" required></div><button class="btn" type="submit">${register ? 'Daftar' : 'Masuk'}</button><p class="small muted">${register ? `Sudah punya akun? <a href="/masuk?next=${encodeURIComponent(safeNext)}">Masuk</a>` : `Belum punya akun? <a href="/daftar?next=${encodeURIComponent(safeNext)}">Daftar</a>`}</p></form></div>`, register ? 'Daftar' : 'Masuk');
+    const next = new URLSearchParams(location.search).get('next') || '/akun/pengajuan';
+    const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '/akun/pengajuan';
+    const query = safeNext === '/akun/pengajuan' ? '' : '?next=' + encodeURIComponent(safeNext);
+    shell(`<div class="container tenant-auth"><div class="tenant-auth-layout"><section class="tenant-auth-intro"><img src="/assets/perhutani-forest-logo.png" alt="" width="86" height="86"><h1>${register ? 'Mulai dari akun Anda.' : 'Selamat datang kembali.'}</h1><p>Kelola pengajuan dan dokumen sewa dalam satu tempat.</p><ul><li>Ajukan survei tanpa mengunggah KTP.</li><li>Lengkapi berkas saat mengajukan sewa.</li><li>Pantau masa sewa dan riwayat perpanjangan.</li></ul><p class="tenant-auth-note">Jadwal survei dan kesepakatan sewa tetap dibahas bersama pengelola melalui WhatsApp.</p></section><section class="tenant-auth-form"><h2>${register ? 'Daftar penyewa' : 'Masuk penyewa'}</h2><p>${register ? 'KTP tidak diperlukan saat membuat akun.' : 'Katalog tetap bisa dijelajahi tanpa akun.'}</p><form id="auth-form" novalidate><p class="error" id="auth-error" role="alert" hidden></p><fieldset>${register ? '<div class="field"><label for="name">Nama lengkap</label><input id="name" autocomplete="name" placeholder="Nama sesuai identitas" required></div><div class="field"><label for="whatsapp">Nomor WhatsApp</label><input id="whatsapp" type="tel" inputmode="tel" autocomplete="tel" placeholder="0812xxxxxxxx" required></div>' : ''}<div class="field"><label for="email">Identitas login (email)</label><input id="email" type="email" autocomplete="email" placeholder="nama@email.com" required></div><div class="field"><label for="password">Kata sandi${register ? ' (minimal 8 karakter)' : ''}</label><input id="password" type="password" autocomplete="${register ? 'new-password' : 'current-password'}" required></div><button class="btn" type="submit">${register ? 'Buat akun' : 'Masuk'}</button></fieldset></form><p class="tenant-auth-switch">${register ? 'Sudah memiliki akun?' : 'Belum memiliki akun?'} <a href="/${register ? 'masuk' : 'daftar'}${query}">${register ? 'Masuk' : 'Daftar penyewa'}</a></p>${query ? `<a class="muted small" href="${esc(safeNext)}">Kembali ke detail aset</a>` : ''}</section></div></div>`, register ? 'Daftar Penyewa' : 'Masuk Penyewa');
     $('#auth-form').onsubmit = async event => {
       event.preventDefault();
-      const button = $('button[type=submit]', event.target);
-      button.disabled = true;
+      const button = $('button[type=submit]', event.target), error = $('#auth-error');
+      button.disabled = true; error.hidden = true;
       const body = {email: $('#email').value, password: $('#password').value};
       if (register) Object.assign(body, {name: $('#name').value, whatsapp: $('#whatsapp').value});
       try {
         state.user = await api(register ? '/api/register' : '/api/user/login', {method: 'POST', body: JSON.stringify(body)});
         navigate(safeNext);
-      } catch (error) { $('#auth-error').textContent = error.message; button.disabled = false; }
+      } catch (failure) { error.textContent = failure.message; error.hidden = false; button.disabled = false; }
     };
   },
   async logout() {
@@ -99,27 +105,60 @@ const Account = {
     navigate('/');
   },
 
-  // ---------------------------------------------------------------- akun saya
-  home({applications, ktp, leases}) {
-    const user = state.user.user;
-    const latest = ktp.latest;
-    const ktpBlock = `<section class="admin-section" id="dokumen"><h2>Dokumen Saya</h2><p class="muted small">KTP dipakai ulang untuk permohonan dan perpanjangan berikutnya selama datanya masih sesuai. Format PDF, JPG, atau PNG, maksimal 5 MB.</p>${latest ? `<div class="attention-row"><div><strong>KTP versi ${latest.version}</strong> ${chip(DOC_STATUS[latest.status], latest.status)}<p>Diunggah ${dateId(latest.created)}</p>${latest.reason ? `<div class="notice"><strong>Alasan perbaikan:</strong> ${esc(latest.reason)}</div>` : ''}</div><a class="btn secondary small" href="${esc(latest.url)}" download>Unduh</a></div>` : empty('KTP belum diunggah', 'KTP baru wajib saat mengajukan permohonan sewa. Mengajukan survei tidak memerlukan KTP.')}<form id="ktp-form" class="form-grid"><div class="field full"><label for="ktp-file">${latest ? 'Ganti KTP (versi baru)' : 'Unggah KTP'}</label><input id="ktp-file" type="file" accept="application/pdf,image/jpeg,image/png" required></div><div class="field full"><button class="btn small" type="submit">Unggah KTP</button></div></form></section>`;
-    const leaseBlock = `<section class="admin-section" id="sewa"><h2>Sewa Saya</h2>${leases.length ? leases.map(l => `<div class="attention-row"><div><strong>${esc(l.house.name)} (${esc(l.house.code)})</strong><p>Periode aktif: ${dateId(l.current.start)} – ${dateId(l.current.end)} (${l.current.period === 'monthly' ? 'bulanan' : 'tahunan'})</p>${l.periods.length > 1 ? `<details><summary class="small">Riwayat periode (${l.periods.length})</summary><ul>${l.periods.map(p => `<li>${dateId(p.start)} – ${dateId(p.end)}</li>`).join('')}</ul></details>` : ''}</div>${l.open_renewal ? '<span class="badge attention">Perpanjangan diproses</span>' : `<button class="btn small" data-renew="${esc(l.id)}">Ajukan Perpanjangan</button>`}</div>`).join('') : empty('Belum ada sewa aktif', 'Sewa yang telah diaktifkan pengelola akan tampil di sini beserta tanggal berakhirnya.')}</section>`;
-    const appBlock = `<section class="admin-section" id="pengajuan"><h2>Pengajuan Saya</h2>${applications.length ? `<div class="table-wrap asset-register"><table role="table"><caption class="sr-only">Daftar pengajuan Anda</caption><thead><tr><th scope="col">No. Referensi</th><th scope="col">Jenis</th><th scope="col">Aset</th><th scope="col">Status</th><th scope="col">Pembayaran</th><th scope="col">Tindakan</th></tr></thead><tbody>${applications.map(a => `<tr><td data-label="No. Referensi">${esc(a.ref)}</td><td data-label="Jenis">${esc(APP_KIND[a.kind])}</td><td data-label="Aset">${esc(a.house?.name)} (${esc(a.house?.code)})</td><td data-label="Status">${chip(APP_STATUS[a.status], a.status)}</td><td data-label="Pembayaran">${a.kind === 'survei' ? '-' : chip(PAYMENT[a.payment], a.payment)}</td><td data-label="Tindakan"><a class="nowrap" href="/akun/pengajuan/${a.id}">Lihat Detail</a></td></tr>`).join('')}</tbody></table></div>` : empty('Belum ada pengajuan', 'Pilih aset di katalog lalu ajukan survei.', '<a class="btn" href="/rumah">Jelajahi Aset</a>')}</section>`;
-    shell(`<div class="container admin-bottom"><div class="admin-top"><div><h1>Akun Saya</h1><p class="muted small">${esc(user.name)} · ${esc(user.email)} · +${esc(user.whatsapp)}</p></div><div class="admin-actions"><button class="btn secondary small" id="user-logout">Keluar</button></div></div>${appBlock}${leaseBlock}${ktpBlock}</div>`, 'Akun Saya');
-    $('#user-logout').onclick = Account.logout;
-    const ktpForm = $('#ktp-form');
-    ktpForm.onsubmit = guard($('button', ktpForm), async () => {
-      const file = await readFile($('#ktp-file'));
-      await api('/api/my/ktp', {method: 'POST', body: JSON.stringify(file)});
-      toast('KTP terunggah dan menunggu verifikasi pengelola.');
-      Account.home(await Account.load());
-    });
+  // ---------------------------------------------------------------- area akun
+  accountShell(active, data, body, title) {
+    const links = [['profil', 'Profil & Dokumen'], ['pengajuan', 'Pengajuan Saya'], ['sewa', 'Sewa Saya']];
+    shell(`<div class="container tenant-page"><div class="tenant-layout"><aside class="tenant-sidebar"><p>Area penyewa</p><nav aria-label="Navigasi akun">${links.map(([key, label]) => `<a href="/akun/${key}" ${active === key ? 'aria-current="page"' : ''}>${label}</a>`).join('')}</nav><a class="tenant-catalog-link" href="/rumah">Kembali ke katalog</a><button type="button" class="text-button tenant-demo-logout" id="user-logout">Keluar</button></aside><section class="tenant-content"><div class="page-head"><h1>${esc(title)}</h1></div>${body}</section></div></div>`, title);
+    $('#user-logout').onclick = () => Account.logout();
+  },
+  stepper(a) {
+    const labels = a.kind === 'survei' ? ['Diajukan', 'Jadwal survei', 'Survei selesai'] : ['Lengkapi berkas', 'Verifikasi pengelola', 'Pembayaran', 'Sewa aktif'];
+    const allDone = a.applied || (a.kind === 'survei' && a.status === 'selesai');
+    return `<ol class="stepper${a.step === 0 ? ' closed' : ''}" aria-label="Tahapan pengajuan">${labels.map((label, i) => {
+      const n = i + 1, mode = allDone || (a.step > 0 && n < a.step) ? 'done' : n === a.step ? 'current' : '';
+      return `<li class="${mode}"${mode === 'current' ? ' aria-current="step"' : ''}><span class="step-dot">${mode === 'done' ? '✓' : n}</span><span class="step-label">${label}</span></li>`;
+    }).join('')}</ol>`;
+  },
+  page_pengajuan(data) {
+    const filters = [['', 'Semua'], ['survei', 'Survei'], ['sewa_baru', 'Baru sewa'], ['perpanjangan', 'Perpanjangan']];
+    const card = a => `<article class="tenant-panel app-card"><div class="app-card-head"><div><h2>${esc(APP_KIND[a.kind])}</h2><p class="small">${esc(a.house?.name)} (${esc(a.house?.code)}) · ${esc(a.ref)}</p></div><div>${chip(APP_STATUS[a.status], a.status)}${a.kind === 'survei' ? '' : ' ' + chip(PAYMENT[a.payment], a.payment)}</div></div>${Account.stepper(a)}<p class="next-action"><strong>Langkah berikutnya:</strong> ${esc(a.next)}</p><a class="btn small" href="/akun/pengajuan/${a.id}">Buka Pengajuan</a></article>`;
+    Account.accountShell('pengajuan', data, `<div class="tenant-tabs" role="group" aria-label="Jenis pengajuan">${filters.map(([key, label], i) => `<button type="button" class="${i === 0 ? 'is-selected' : ''}" data-kind="${key}">${label}</button>`).join('')}</div><div id="app-list"></div><div class="tenant-help"><h3>Dokumen mengikuti tahap pengajuan</h3><p>Survei tidak memerlukan KTP. Permohonan baru sewa membutuhkan KTP dan surat permohonan. Perpanjangan menggunakan surat yang berbeda dan dapat memakai kembali KTP terverifikasi.</p></div>`, 'Pengajuan Saya');
+    const draw = kind => {
+      const rows = data.applications.filter(a => !kind || a.kind === kind);
+      $('#app-list').innerHTML = rows.length ? rows.map(card).join('') : `<div class="tenant-panel preview-empty"><div class="empty-symbol" aria-hidden="true">${glyph('location')}</div><h2>Belum ada pengajuan${kind ? ' ' + filters.find(f => f[0] === kind)[1].toLowerCase() : ''}</h2><p>Pilih aset di katalog lalu ajukan survei. Nomor referensi serta tindakan berikutnya akan terlihat di sini.</p><a class="btn" href="/rumah">Jelajahi Aset</a></div>`;
+      $$('.tenant-tabs button').forEach(button => button.classList.toggle('is-selected', button.dataset.kind === kind));
+    };
+    $$('.tenant-tabs button').forEach(button => button.onclick = () => draw(button.dataset.kind));
+    draw('');
+  },
+  page_sewa(data) {
+    const leases = data.leases.length ? data.leases.map(l => `<article class="tenant-panel app-card"><div><h2>${esc(l.house.name)} (${esc(l.house.code)})</h2><p>Periode aktif: <strong>${dateId(l.current.start)} – ${dateId(l.current.end)}</strong> (${l.current.period === 'monthly' ? 'bulanan' : 'tahunan'})</p></div>${l.periods.length > 1 ? `<details><summary class="small">Riwayat periode (${l.periods.length})</summary><ul>${l.periods.map(p => `<li>${dateId(p.start)} – ${dateId(p.end)}</li>`).join('')}</ul></details>` : ''}</article>`).join('') : '<div class="tenant-panel preview-empty"><h2>Belum ada sewa aktif</h2><p>Aset, tanggal sewa, dan riwayat periode akan terlihat setelah pengajuan disetujui serta pelunasan dikonfirmasi admin.</p><a class="btn" href="/rumah">Jelajahi Aset</a></div>';
+    const row = (extra, action) => `<div class="document-item"><div class="document-symbol" aria-hidden="true">↻</div><div><h3>Surat Permohonan Perpanjangan Sewa</h3><p>${extra}Pengelola menyiapkan surat. Anda mengunduh, menandatangani di luar website, lalu mengunggah hasilnya.</p></div>${action}</div>`;
+    const renew = data.leases.length ? data.leases.map(l => row(`${esc(l.house.name)}. `, l.open_renewal ? '<span class="document-status">Perpanjangan diproses</span>' : `<button class="btn secondary small" data-renew="${esc(l.id)}">Ajukan Perpanjangan</button>`)).join('') : row('', '<button class="btn secondary small" disabled>Ajukan Perpanjangan</button>');
+    Account.accountShell('sewa', data, `${leases}<div class="tenant-panel"><h2>Perpanjangan sewa</h2><p>Perpanjangan diajukan dari sewa yang tercatat. Periode baru dan surat perpanjangan disimpan terpisah agar riwayat sebelumnya tetap tersedia.</p>${renew}</div>`, 'Sewa Saya');
     $$('[data-renew]').forEach(button => button.onclick = guard(button, async () => {
-      if (!await askConfirm('Ajukan perpanjangan?', 'Pengajuan perpanjangan akan dicatat. Surat permohonan perpanjangan disiapkan pengelola, lalu Anda unduh, tanda tangani, dan unggah kembali.')) return;
+      if (!await askConfirm('Ajukan perpanjangan?', 'Surat permohonan perpanjangan disiapkan pengelola. Anda mengunduh, menandatangani di luar website, lalu mengunggah hasilnya. KTP terverifikasi dipakai kembali.')) return;
       const created = await api(`/api/my/leases/${button.dataset.renew}/renew`, {method: 'POST', body: '{}'});
       navigate('/akun/pengajuan/' + created.id);
     }));
+  },
+  page_profil(data) {
+    const user = state.user.user, latest = data.ktp.latest;
+    Account.accountShell('profil', data, `<div class="tenant-panel"><div class="panel-heading"><div><h2>Profil penyewa</h2><p>Identitas dan nomor WhatsApp untuk berkomunikasi dengan pengelola.</p></div></div><form id="profile-form" class="form-grid"><div class="field"><label for="p-name">Nama lengkap</label><input id="p-name" value="${esc(user.name)}" autocomplete="name" required></div><div class="field"><label for="p-wa">Nomor WhatsApp</label><input id="p-wa" type="tel" value="${esc('0' + user.whatsapp.replace(/^62/, ''))}" autocomplete="tel" required></div><div class="field"><label for="p-email">Email (identitas login)</label><input id="p-email" value="${esc(user.email)}" readonly></div><div class="field full"><button class="btn small" type="submit">Simpan Profil</button></div></form></div><div class="tenant-panel" id="dokumen"><div class="panel-heading"><div><h2>Dokumen identitas</h2><p>KTP hanya diperlukan saat mengajukan sewa.</p></div><span class="document-status">${latest ? esc(DOC_STATUS[latest.status]) : 'Belum Diunggah'}</span></div><div class="document-item"><div class="document-symbol" aria-hidden="true">ID</div><div><h3>Kartu Tanda Penduduk</h3><p>${latest ? `Versi ${latest.version} diunggah ${dateId(latest.created)}. ` : ''}KTP terverifikasi dapat digunakan kembali untuk perpanjangan selama data masih sesuai.</p>${latest?.reason ? `<div class="notice"><strong>Perlu perbaikan:</strong> ${esc(latest.reason)}</div>` : ''}${latest ? `<p><a class="small" href="${esc(latest.url)}" download>Unduh berkas saya</a></p>` : ''}</div><div><input id="ktp-file" type="file" accept="application/pdf,image/jpeg,image/png" hidden><button class="btn secondary small" type="button" id="ktp-btn">${latest ? 'Ganti KTP' : 'Unggah KTP'}</button></div></div><p class="document-privacy">Dokumen hanya dapat diakses pemilik akun dan admin. Format PDF, JPG, atau PNG, maksimal 5 MB; setiap unggahan disimpan sebagai versi baru.</p></div>`, 'Profil & Dokumen Saya');
+    const profile = $('#profile-form');
+    profile.onsubmit = guard($('button', profile), async () => {
+      state.user = await api('/api/my/profile', {method: 'PUT', body: JSON.stringify({name: $('#p-name').value, whatsapp: $('#p-wa').value})});
+      toast('Profil tersimpan.');
+      Account.page_profil(await Account.load());
+    });
+    const pick = $('#ktp-file'), btn = $('#ktp-btn');
+    btn.onclick = () => pick.click();
+    pick.onchange = guard(btn, async () => {
+      const file = await readFile(pick);
+      await api('/api/my/ktp', {method: 'POST', body: JSON.stringify(file)});
+      toast('KTP terunggah dan menunggu verifikasi pengelola.');
+      Account.page_profil(await Account.load());
+    });
   },
 
   // ------------------------------------------------------------ detail pengajuan
@@ -133,9 +172,9 @@ const Account = {
     const payMsg = `Halo, saya ${name}. Terkait ${APP_KIND[a.kind]} ${a.ref} untuk ${house.name} (${house.code}), mohon informasi pembayaran.`;
     const chat = waLink(form ? payMsg : survey);
     const open = !a.closed && a.payment === 'belum' && !a.applied;
-    const steps = !form ? `<section class="detail-block"><h2>Langkah berikutnya</h2><ol><li>Hubungi pengelola melalui WhatsApp dengan nomor referensi <strong>${esc(a.ref)}</strong> untuk menyepakati jadwal survei.</li><li>Setelah survei dan ada kesepakatan, ajukan kerja sama dari detail aset.</li></ol><p class="small muted">Membuka WhatsApp belum berarti jadwal disetujui. Pengelola mencatat jadwal pada pengajuan ini.</p>${chat && open ? `<a class="btn" href="${esc(chat)}" target="_blank" rel="noopener noreferrer">Lanjut ke WhatsApp</a>` : ''}${a.status !== 'dibatalkan' && house.status === 'Tersedia' ? `<a class="btn secondary" href="/rumah/${esc(house.id)}">Ajukan Kerja Sama di Detail Aset</a>` : ''}</section>`
-      : `<section class="detail-block"><h2>Kelengkapan berkas</h2><ol class="steps"><li><strong>KTP</strong> ${ktp ? chip(DOC_STATUS[ktp.status], ktp.status) : chip('Belum diunggah', 'perlu_perbaikan')}${ktp?.reason ? `<div class="notice">Perlu perbaikan: ${esc(ktp.reason)}</div>` : ''}<p class="small muted">${ktp?.status === 'terverifikasi' ? 'KTP terverifikasi dipakai kembali, tidak perlu unggah ulang.' : 'Kelola KTP di '}${ktp?.status === 'terverifikasi' ? '' : '<a href="/akun#dokumen">Dokumen Saya</a>.'}</p></li><li><strong>Surat siap tanda tangan</strong> ${template ? `<a href="${esc(template.url)}" download>Unduh surat</a>` : '<span class="muted">Menunggu pengelola menyiapkan surat.</span>'}<p class="small muted">Cetak, tanda tangani di luar website, lalu foto atau pindai dan unggah hasilnya.</p></li><li><strong>Surat bertanda tangan</strong> ${newest ? chip(DOC_STATUS[newest.status], newest.status) : chip('Belum diunggah', 'perlu_perbaikan')}${newest?.reason ? `<div class="notice">Perlu perbaikan: ${esc(newest.reason)}</div>` : ''}${signed.length ? `<ul>${signed.map(d => `<li>Versi ${d.version} · ${dateId(d.created)} · ${esc(DOC_STATUS[d.status])}</li>`).join('')}</ul>` : ''}${template && !a.closed ? `<form id="sign-form" class="form-grid"><div class="field full"><label for="sign-file">${newest ? 'Unggah ulang surat bertanda tangan' : 'Unggah surat bertanda tangan'}</label><input id="sign-file" type="file" accept="application/pdf,image/jpeg,image/png" required></div><div class="field full"><button class="btn small" type="submit">Unggah</button></div></form>` : ''}</li><li><strong>Keputusan pengelola</strong> ${chip(APP_STATUS[a.status], a.status)}${a.admin_note ? `<p>${esc(a.admin_note)}</p>` : ''}</li><li><strong>Pembayaran</strong> ${chip(PAYMENT[a.payment], a.payment)}<p class="small muted">Pembayaran dilakukan melalui WhatsApp setelah pengajuan disetujui. Status dikonfirmasi manual oleh pengelola.</p>${a.status === 'disetujui' && chat && !a.applied ? `<a class="btn small" href="${esc(chat)}" target="_blank" rel="noopener noreferrer">Lanjut ke WhatsApp</a>` : ''}</li></ol>${a.applied ? '<div class="notice">Pengajuan ini sudah aktif dan tercatat pada <a href="/akun#sewa">Sewa Saya</a>.</div>' : ''}</section>`;
-    shell(`<div class="container admin-bottom"><div class="breadcrumb"><a href="/akun">Akun Saya</a> / ${esc(a.ref)}</div><div class="admin-top"><div><h1>${esc(APP_KIND[a.kind])}</h1><p class="muted">${esc(a.ref)} · <a href="/rumah/${esc(house.id)}">${esc(house.name)} (${esc(house.code)})</a></p></div><div>${chip(APP_STATUS[a.status], a.status)}</div></div>${steps}${open && a.status !== 'disetujui' ? '<button class="btn secondary small" id="cancel-app">Batalkan Pengajuan</button>' : ''}</div>`, a.ref);
+    const steps = !form ? `<section class="tenant-panel"><h2>Langkah berikutnya</h2><ol><li>Hubungi pengelola melalui WhatsApp dengan nomor referensi <strong>${esc(a.ref)}</strong> untuk menyepakati jadwal survei.</li><li>Setelah survei dan ada kesepakatan, ajukan kerja sama dari detail aset.</li></ol><p class="small muted">Membuka WhatsApp belum berarti jadwal disetujui. Pengelola mencatat jadwal pada pengajuan ini.</p>${chat && open ? `<a class="btn" href="${esc(chat)}" target="_blank" rel="noopener noreferrer">Lanjut ke WhatsApp</a>` : ''}${!a.closed && house.status === 'Tersedia' ? '<button class="btn secondary" id="continue-btn">Lanjut ke Permohonan Sewa</button><p class="small muted">Gunakan setelah survei dan ada kesepakatan. Ketersediaan aset diperiksa ulang.</p>' : ''}</section>`
+      : `<section class="tenant-panel"><h2>Kelengkapan berkas</h2><ol class="steps"><li><strong>KTP</strong> ${ktp ? chip(DOC_STATUS[ktp.status], ktp.status) : chip('Belum diunggah', 'perlu_perbaikan')}${ktp?.reason ? `<div class="notice">Perlu perbaikan: ${esc(ktp.reason)}</div>` : ''}<p class="small muted">${ktp?.status === 'terverifikasi' ? 'KTP terverifikasi dipakai kembali, tidak perlu unggah ulang.' : 'Kelola KTP di '}${ktp?.status === 'terverifikasi' ? '' : '<a href="/akun/profil">Profil & Dokumen</a>.'}</p></li><li><strong>Surat siap tanda tangan</strong> ${template ? `<a href="${esc(template.url)}" download>Unduh surat</a>` : '<span class="muted">Menunggu pengelola menyiapkan surat.</span>'}<p class="small muted">Cetak, tanda tangani di luar website, lalu foto atau pindai dan unggah hasilnya.</p></li><li><strong>Surat bertanda tangan</strong> ${newest ? chip(DOC_STATUS[newest.status], newest.status) : chip('Belum diunggah', 'perlu_perbaikan')}${newest?.reason ? `<div class="notice">Perlu perbaikan: ${esc(newest.reason)}</div>` : ''}${signed.length ? `<ul>${signed.map(d => `<li>Versi ${d.version} · ${dateId(d.created)} · ${esc(DOC_STATUS[d.status])}</li>`).join('')}</ul>` : ''}${template && !a.closed ? `<form id="sign-form" class="form-grid"><div class="field full"><label for="sign-file">${newest ? 'Unggah ulang surat bertanda tangan' : 'Unggah surat bertanda tangan'}</label><input id="sign-file" type="file" accept="application/pdf,image/jpeg,image/png" required></div><div class="field full"><button class="btn small" type="submit">Unggah</button></div></form>` : ''}</li><li><strong>Keputusan pengelola</strong> ${chip(APP_STATUS[a.status], a.status)}${a.admin_note ? `<p>${esc(a.admin_note)}</p>` : ''}</li><li><strong>Pembayaran</strong> ${chip(PAYMENT[a.payment], a.payment)}<p class="small muted">Pembayaran dilakukan melalui WhatsApp setelah pengajuan disetujui. Status dikonfirmasi manual oleh pengelola.</p>${a.status === 'disetujui' && chat && !a.applied ? `<a class="btn small" href="${esc(chat)}" target="_blank" rel="noopener noreferrer">Lanjut ke WhatsApp</a>` : ''}</li></ol>${a.applied ? '<div class="notice">Pengajuan ini sudah aktif dan tercatat pada <a href="/akun/sewa">Sewa Saya</a>.</div>' : ''}</section>`;
+    Account.accountShell('pengajuan', null, `<a class="breadcrumb" href="/akun/pengajuan">Kembali ke pengajuan saya</a><div class="tenant-panel"><div class="panel-heading"><div><h2>${esc(a.ref)}</h2><p>Aset: <a href="/rumah/${esc(house.id)}">${esc(house.name)} (${esc(house.code)})</a></p></div><div>${chip(APP_STATUS[a.status], a.status)}${form ? ' ' + chip(PAYMENT[a.payment], a.payment) : ''}</div></div>${Account.stepper(a)}<p class="next-action"><strong>Langkah berikutnya:</strong> ${esc(a.next)}</p></div>${steps}${open && a.status !== 'disetujui' ? '<button class="btn secondary small" id="cancel-app">Batalkan Pengajuan</button>' : ''}`, APP_KIND[a.kind]);
     const refresh = async () => Account.applicationPage(await api('/api/my/applications/' + a.id));
     const sign = $('#sign-form');
     if (sign) sign.onsubmit = guard($('button', sign), async () => {
@@ -143,6 +182,12 @@ const Account = {
       await api(`/api/my/applications/${a.id}/documents`, {method: 'POST', body: JSON.stringify(file)});
       toast('Surat terunggah dan menunggu pemeriksaan pengelola.');
       await refresh();
+    });
+    const cont = $('#continue-btn');
+    if (cont) cont.onclick = guard(cont, async () => {
+      const created = await api('/api/my/applications', {method: 'POST', body: JSON.stringify({kind: 'sewa_baru', house_id: house.id})});
+      toast(created.existing ? 'Membuka permohonan sewa Anda.' : 'Permohonan sewa dibuat. Lengkapi berkas Anda.');
+      navigate('/akun/pengajuan/' + created.id);
     });
     const cancel = $('#cancel-app');
     if (cancel) cancel.onclick = guard(cancel, async () => {
@@ -186,14 +231,14 @@ const Account = {
     const params = new URLSearchParams(location.search);
     const kinds = Object.entries(APP_KIND).map(([k, v]) => `<option value="${k}"${params.get('kind') === k ? ' selected' : ''}>${v}</option>`).join('');
     const statuses = Object.entries(APP_STATUS).map(([k, v]) => `<option value="${k}"${params.get('status') === k ? ' selected' : ''}>${v}</option>`).join('');
-    adminShell(`<div class="admin-filter"><div class="field"><label for="f-q">Cari referensi, nama, atau email</label><input id="f-q" type="search" value="${esc(params.get('q') || '')}"></div><div class="field"><label for="f-kind">Jenis</label><select id="f-kind"><option value="">Semua jenis</option>${kinds}</select></div><div class="field"><label for="f-status">Status</label><select id="f-status"><option value="">Semua status</option>${statuses}</select></div></div><p class="small muted" id="app-count" aria-live="polite"></p><div id="app-table"></div>`, 'Pengajuan dan Dokumen');
+    adminShell(`<div class="admin-filter filter-3"><div class="field"><label for="f-q">Cari referensi, nama, atau email</label><input id="f-q" type="search" value="${esc(params.get('q') || '')}"></div><div class="field"><label for="f-kind">Jenis</label><select id="f-kind"><option value="">Semua jenis</option>${kinds}</select></div><div class="field"><label for="f-status">Status</label><select id="f-status"><option value="">Semua status</option>${statuses}</select></div></div><p class="small muted" id="app-count" aria-live="polite"></p><div id="app-table"></div>`, 'Pengajuan dan Dokumen');
     const load = async () => {
       const query = new URLSearchParams();
       for (const [key, id] of [['q', 'f-q'], ['kind', 'f-kind'], ['status', 'f-status']]) if ($('#' + id).value) query.set(key, $('#' + id).value);
       try {
         const rows = await api('/api/admin/applications?' + query);
         $('#app-count').textContent = `${rows.length} pengajuan`;
-        $('#app-table').innerHTML = rows.length ? `<div class="table-wrap asset-register"><table role="table"><caption class="sr-only">Daftar pengajuan penyewa</caption><thead><tr><th scope="col">Referensi</th><th scope="col">Penyewa</th><th scope="col">Aset</th><th scope="col">Jenis</th><th scope="col">Status</th><th scope="col">Pembayaran</th><th scope="col">Berkas menunggu</th><th scope="col">Tindakan</th></tr></thead><tbody>${rows.map(a => `<tr><td data-label="Referensi">${esc(a.ref)}</td><td data-label="Penyewa">${esc(a.tenant.name)}<small>${esc(a.tenant.email)}</small></td><td data-label="Aset">${esc(a.house?.name)} (${esc(a.house?.code)})</td><td data-label="Jenis">${esc(APP_KIND[a.kind])}</td><td data-label="Status">${chip(APP_STATUS[a.status], a.status)}</td><td data-label="Pembayaran">${a.kind === 'survei' ? '-' : chip(PAYMENT[a.payment], a.payment)}</td><td data-label="Berkas menunggu">${a.pending_documents || 0}</td><td data-label="Tindakan"><a class="nowrap" href="/admin/pengajuan/${a.id}">Kelola</a></td></tr>`).join('')}</tbody></table></div>` : empty('Belum ada pengajuan', 'Pengajuan penyewa akan tampil di sini.');
+        $('#app-table').innerHTML = rows.length ? `<div class="table-wrap asset-register"><table role="table"><caption class="sr-only">Daftar pengajuan penyewa</caption><thead><tr><th scope="col">Referensi</th><th scope="col">Penyewa</th><th scope="col">Aset</th><th scope="col">Jenis</th><th scope="col">Status</th><th scope="col">Pembayaran</th><th scope="col">KTP</th><th scope="col">Berkas menunggu</th><th scope="col">Tindakan</th></tr></thead><tbody>${rows.map(a => `<tr><td data-label="Referensi">${esc(a.ref)}</td><td data-label="Penyewa">${esc(a.tenant.name)}<small>${esc(a.tenant.email)}</small></td><td data-label="Aset">${esc(a.house?.name)} (${esc(a.house?.code)})</td><td data-label="Jenis">${esc(APP_KIND[a.kind])}</td><td data-label="Status">${chip(APP_STATUS[a.status], a.status)}</td><td data-label="Pembayaran">${a.kind === 'survei' ? '-' : chip(PAYMENT[a.payment], a.payment)}</td><td data-label="KTP">${a.ktp_status ? chip(DOC_STATUS[a.ktp_status], a.ktp_status) : '-'}</td><td data-label="Berkas menunggu">${a.pending_documents || 0}</td><td data-label="Tindakan"><a class="nowrap" href="/admin/pengajuan/${a.id}">Kelola</a></td></tr>`).join('')}</tbody></table></div>` : empty('Belum ada pengajuan', 'Pengajuan penyewa akan tampil di sini.');
         history.replaceState({}, '', '/admin/pengajuan' + (query.size ? '?' + query : ''));
       } catch (error) { toast(error.message); }
     };
@@ -226,12 +271,7 @@ const Account = {
       toast('Pengajuan tersimpan.');
       await reload();
     });
-    $$('[data-save-doc]').forEach(button => button.onclick = guard(button, async () => {
-      const id = button.dataset.saveDoc;
-      await api('/api/admin/documents/' + id, {method: 'PUT', body: JSON.stringify({status: $('#ds-' + id).value, reason: $('#dr-' + id).value})});
-      toast('Pemeriksaan berkas tersimpan.');
-      await reload();
-    }));
+    Account.bindDocs(reload);
     const letter = $('#letter-form');
     if (letter) letter.onsubmit = guard($('button', letter), async () => {
       const file = await readFile($('#letter-file'));
@@ -251,6 +291,35 @@ const Account = {
         await reload();
       });
     }
+  },
+
+  bindDocs(reload) {
+    $$('[data-save-doc]').forEach(button => button.onclick = guard(button, async () => {
+      const id = button.dataset.saveDoc;
+      await api('/api/admin/documents/' + id, {method: 'PUT', body: JSON.stringify({status: $('#ds-' + id).value, reason: $('#dr-' + id).value})});
+      toast('Pemeriksaan berkas tersimpan.');
+      await reload();
+    }));
+  },
+
+  tenantList() {
+    adminShell(`<div class="admin-filter"><div class="field"><label for="t-q">Cari nama, email, atau WhatsApp</label><input id="t-q" type="search"></div><div class="field"><label for="t-ktp">Status KTP</label><select id="t-ktp"><option value="">Semua status KTP</option><option value="none">Belum diunggah</option><option value="menunggu">Menunggu verifikasi</option><option value="terverifikasi">Terverifikasi</option><option value="perlu_perbaikan">Perlu perbaikan</option></select></div></div><p class="small muted" id="t-count" aria-live="polite"></p><div id="t-table"></div>`, 'Penyewa dan KTP');
+    let all = [];
+    const draw = () => {
+      const filter = $('#t-ktp').value;
+      const rows = all.filter(t => !filter || (filter === 'none' ? !t.ktp : t.ktp?.status === filter));
+      $('#t-count').textContent = `${rows.length} penyewa`;
+      $('#t-table').innerHTML = rows.length ? `<div class="table-wrap asset-register"><table role="table"><caption class="sr-only">Daftar penyewa</caption><thead><tr><th scope="col">Penyewa</th><th scope="col">WhatsApp</th><th scope="col">KTP</th><th scope="col">Pengajuan</th><th scope="col">Tindakan</th></tr></thead><tbody>${rows.map(t => `<tr><td data-label="Penyewa">${esc(t.name)}<small>${esc(t.email)}</small></td><td data-label="WhatsApp">+${esc(t.whatsapp)}</td><td data-label="KTP">${t.ktp ? chip(DOC_STATUS[t.ktp.status], t.ktp.status) : chip('Belum diunggah', 'belum')}</td><td data-label="Pengajuan">${t.applications} (${t.open} aktif)</td><td data-label="Tindakan"><a class="nowrap" href="/admin/penyewa/${t.id}">${t.ktp?.status === 'menunggu' ? 'Periksa KTP' : 'Lihat'}</a></td></tr>`).join('')}</tbody></table></div>` : empty('Belum ada penyewa', 'Akun penyewa yang mendaftar akan tampil di sini.');
+    };
+    const load = async () => { try { all = await api('/api/admin/tenants?q=' + encodeURIComponent($('#t-q').value)); draw(); } catch (error) { toast(error.message); } };
+    $('#t-q').oninput = () => { clearTimeout(Account.timer); Account.timer = setTimeout(load, 250); };
+    $('#t-ktp').onchange = draw;
+    load();
+  },
+
+  tenantDetail(t) {
+    adminShell(`<div class="breadcrumb"><a href="/admin/penyewa">Penyewa dan KTP</a> / ${esc(t.name)}</div><section class="admin-section"><h2>${esc(t.name)}</h2><dl class="profile-list"><div><dt>Email</dt><dd>${esc(t.email)}</dd></div><div><dt>WhatsApp</dt><dd><a href="https://wa.me/${esc(t.whatsapp)}" target="_blank" rel="noopener noreferrer">+${esc(t.whatsapp)}</a></dd></div><div><dt>Terdaftar</dt><dd>${dateId(t.created)}</dd></div></dl></section><section class="admin-section"><h2>KTP</h2>${t.ktp ? Account.docReview(t.ktp_versions[0]) : empty('KTP belum diunggah', 'Penyewa belum mengunggah KTP.')}${t.ktp_versions.length > 1 ? `<details><summary class="small">Versi sebelumnya (${t.ktp_versions.length - 1})</summary><ul>${t.ktp_versions.slice(1).map(v => `<li>Versi ${v.version} · ${dateId(v.created)} · ${esc(DOC_STATUS[v.status])} · <a href="${esc(v.url)}" download>Unduh</a></li>`).join('')}</ul></details>` : ''}</section><section class="admin-section"><h2>Pengajuan</h2>${t.application_list.length ? `<ul>${t.application_list.map(a => `<li><a href="/admin/pengajuan/${a.id}">${esc(a.ref)}</a> · ${esc(APP_KIND[a.kind])} · ${esc(a.house?.name)} · ${esc(APP_STATUS[a.status])}</li>`).join('')}</ul>` : '<p class="muted">Belum ada pengajuan.</p>'}</section>${t.leases.length ? `<section class="admin-section"><h2>Sewa</h2>${t.leases.map(l => `<p><strong>${esc(l.house.name)}</strong>: ${dateId(l.current.start)} – ${dateId(l.current.end)}</p>`).join('')}</section>` : ''}`, 'Detail Penyewa');
+    Account.bindDocs(async () => Account.tenantDetail(await api('/api/admin/tenants/' + t.id)));
   },
 
   importPage() {

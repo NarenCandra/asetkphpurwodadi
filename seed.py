@@ -4,6 +4,8 @@ import secrets
 from datetime import timedelta
 
 import app
+import mimetypes
+import storage
 
 
 def seed_demo(append=False):
@@ -34,7 +36,7 @@ def seed_demo(append=False):
                     source = app.ROOT / 'demo' / f'house-{asset_index}.svg'
                 photo_id = secrets.token_hex(16)
                 filename = photo_id + source.suffix
-                (app.DATA / 'uploads' / filename).write_bytes(source.read_bytes())
+                storage.put(app.DATA, 'uploads', filename, source.read_bytes(), mimetypes.guess_type(filename)[0] or 'application/octet-stream')
                 db.execute('INSERT INTO photos VALUES(?,?,?,?)', (photo_id, identifier, filename, position))
     print('7 rumah demonstrasi ditambahkan. Data bukan penawaran nyata. Akun admin tidak dibuat otomatis.')
 

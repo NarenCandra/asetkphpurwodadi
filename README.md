@@ -9,7 +9,7 @@ Prasyarat: Python 3.12 atau lebih baru. Node.js 18+ hanya dibutuhkan untuk pemer
 ```powershell
 Copy-Item .env.example .env
 python app.py init
-python app.py seed-demo
+python app.py seed-demo   # tambahkan --append bila database sudah berisi data
 python app.py create-admin
 python app.py serve
 ```
@@ -58,7 +58,7 @@ Foto pertama menjadi foto utama. Tombol Kiri/Kanan mengurutkan; Jadikan utama me
 
 - Slider memakai batas semua rumah publik pada periode terpilih, tanpa dipersempit kawasan. Langkah Rp1; jika hanya satu harga, slider dikunci pada harga tersebut. Rentang inklusif, titik tidak dapat saling melewati. Slider dan urutan harga nonaktif sebelum periode dipilih; periode berubah mereset keduanya. Tersedia selalu mendahului Dipesan, lalu harga diurutkan dalam setiap kelompok.
 - Tautan langsung rumah Draft/Tersewa menghasilkan API 404, halaman netral “Properti tidak tersedia”, dan akses foto ditolak bagi publik.
-- Publikasi (status Tersedia) hanya mensyaratkan nama dan kode unik. Foto, Google Maps, luas, deskripsi, dan harga boleh kosong dan tampil sebagai belum diisi / harga dibahas dengan pengelola. Jika harga diisi, harus bilangan bulat positif.
+- Publikasi mensyaratkan nama/kode unik, deskripsi, kawasan, alamat, Google Maps HTTPS, luas dan jumlah kamar positif, foto, serta penawaran valid. Harga dan minimum sewa bilangan bulat positif. Tahun tidak dihitung dari bulan.
 - Transisi status mengikuti PRD; tindakan tarik ke Draft tersedia. Perubahan status memerlukan dialog dan konfirmasi pada server. Dipesan memerlukan verifikasi DP manual; Tersewa memerlukan verifikasi pelunasan dan periode/tanggal aktif.
 - Penanda menggunakan tanggal kalender operasional. Tidak ada penjadwalan, perubahan status, perpanjangan atau publikasi otomatis.
 - WhatsApp hanya membuka percakapan, membawa nama/kode/tautan rumah, dan tidak mencatat transaksi atau survei terkonfirmasi.
@@ -78,15 +78,17 @@ Pengujian backend menggunakan database/foto sementara, bukan data aplikasi. Meli
 
 Alur penyewa: katalog -> **Jadwalkan Survei via WhatsApp** (wajib login/daftar, nomor referensi `PGJ-tahun-nnnnn` disimpan sebelum WhatsApp terbuka) -> bila deal, **Ajukan Kerja Sama** -> unggah KTP (dipakai ulang) -> unduh Surat Permohonan siap tanda tangan, tanda tangan di luar web, unggah hasilnya -> admin verifikasi di dashboard -> pembayaran lewat WhatsApp -> admin konfirmasi DP/pelunasan dan mengaktifkan sewa -> **Sewa Saya** menampilkan periode aktif dan tombol **Ajukan Perpanjangan**.
 
-- Halaman penyewa: `/daftar`, `/masuk`, `/akun` (Pengajuan Saya, Sewa Saya, Dokumen Saya), `/akun/pengajuan/<id>`.
-- Halaman admin tambahan: `/admin/pengajuan` (daftar, filter, verifikasi KTP/surat, status, pembayaran, aktivasi sewa, perpanjangan) dan `/admin/impor` (impor Excel).
+- Halaman penyewa: `/daftar`, `/masuk`, `/akun/pengajuan` (Pengajuan Saya dengan stepper tahapan), `/akun/sewa` (Sewa Saya), `/akun/profil` (Profil dan Dokumen Saya), `/akun/pengajuan/<id>` (detail).
+- Halaman admin tambahan: `/admin/penyewa` (daftar penyewa dan verifikasi KTP, termasuk KTP yang diunggah sebelum ada pengajuan), `/admin/pengajuan` (daftar, filter, verifikasi KTP/surat, status, pembayaran, aktivasi sewa, perpanjangan) dan `/admin/impor` (impor Excel).
 - Berkas penyewa disimpan privat di `data/private/` dan hanya dapat diunduh lewat endpoint yang memeriksa pemilik atau admin. PDF/JPG/PNG maksimal 5 MB, setiap unggahan menjadi versi baru.
 - Dokumen Diterima/Terverifikasi tidak otomatis menyetujui pengajuan atau melunasi pembayaran; semuanya dicatat manual oleh admin.
 - Impor Excel: format Daftar Potensi Optimalisasi Aset (sheet `Purwodadi`). Baris menjadi Draft bertipe Bangunan (atau langsung Tersedia untuk yang belum tersewa bila opsi tayangkan dicentang) dengan kode `PWD-001`, ... Untuk bentuk kerja sama sewa 1 th, harga sewa tahunan (minimum 1 tahun) diisi dari Estimasi 2026 dan diberi catatan internal. Kolom Excel yang kosong (Objek/Lokasi/No. Inventaris) diberi catatan agar dilengkapi sebelum publikasi. Satu No. Inventaris boleh muncul di banyak baris. Impor ulang file yang sama tidak menggandakan data dan, bila opsi tayangkan dicentang, ikut menayangkan Draft hasil impor sebelumnya yang belum tersewa.
 - Data internal Perhutani (No. Inventaris, Alas Hak, Bentuk Kerja Sama, Real 2025, Estimasi 2026, Real 2026, Rencana 2027, Keterangan) hanya tampil di admin.
 - Tes tambahan: `python -m unittest tests.test_tenant -v`.
 
-Catatan penyimpanan: versi ini memakai SQLite dan folder `data/` (lihat README di atas). Migrasi ke Supabase belum dikerjakan; `supabase_schema.sql` hanya rancangan awal dan belum dipakai kode.
+Catatan: pada demo statis (Vercel/Netlify) halaman akun tetap berupa pratinjau desain (login demo, tanpa data nyata). Halaman fungsional hanya aktif saat memakai `python app.py serve`.
+
+Penyimpanan: SQLite dan folder `data/` secara bawaan, atau Supabase (lihat bagian Supabase di bawah).
 
 ## Pengujian otomatis (Vitest + Playwright)
 
@@ -101,6 +103,27 @@ Pertama kali: `npm install` lalu `npx playwright install chromium`. Python tetap
 | `npm run test:all` | Ketiganya berurutan. |
 
 Tes E2E menjalankan `tests/e2e_server.py` sendiri: database sementara, data contoh, dan akun admin uji (`e2e-admin`), port 8765. Data aplikasimu di `data/` tidak tersentuh. Ubah port dengan `E2E_PORT=9000`. Bila perintah Python di komputermu bukan `python`, set `E2E_PYTHON=py` (atau `python3`).
+
+## Supabase (database dan penyimpanan berkas)
+
+Secara bawaan data disimpan di SQLite dan folder `data/`. Bila `DATABASE_URL` diisi, seluruh data (aset, akun, pengajuan, sewa) disimpan di Postgres Supabase; bila `SUPABASE_URL` dan `SUPABASE_SERVICE_ROLE_KEY` diisi, foto aset dan berkas penyewa disimpan di Supabase Storage (bucket privat `asset-photos` dan `tenant-docs`). Kedua pengaturan bisa dipakai bersama atau sendiri-sendiri. Kode, tampilan, dan hak akses tidak berubah; berkas tetap hanya bisa diunduh lewat backend yang memeriksa pemilik atau admin.
+
+Langkah setup (dari komputer lokal):
+
+1. Buat project Supabase. Ambil **Connection string (URI)** di Project Settings > Database (pilih Session pooler), serta **Project URL** dan **service_role key** di Project Settings > API.
+2. Isi `.env` (lihat `.env.example`): `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`. Jangan commit `.env`; `service_role key` bersifat rahasia dan hanya dipakai di backend.
+3. `pip install -r requirements.txt` (memasang driver Postgres `psycopg`).
+4. `python app.py db-check` memeriksa koneksi database, pembuatan tabel, status RLS, dan unggah/unduh/hapus berkas. Semua baris harus berhasil.
+5. `python app.py create-admin` membuat akun admin di database Supabase (perintah ini aman dijalankan dari komputer lokal). Lalu `python app.py serve`.
+6. Opsional: `python app.py seed-demo` untuk data contoh, atau impor Excel dari panel admin.
+
+Catatan keamanan: pada Postgres, aplikasi mengaktifkan Row Level Security tanpa kebijakan pada semua tabelnya, sehingga anon key Supabase tidak dapat membaca data lewat REST API. Hanya backend (peran pemilik tabel) yang mengakses data. `python app.py db-check` memverifikasi hal ini.
+
+Cadangan: untuk mode Supabase gunakan Database > Backups di dashboard Supabase (perintah `backup` hanya untuk SQLite lokal). Berkas di Storage tidak ikut cadangan database dan perlu diekspor terpisah.
+
+### Hosting backend (contoh Render)
+
+Backend Python tidak berjalan di Vercel; Vercel tetap dapat dipakai untuk demo statis. Untuk backend, `render.yaml` menyediakan blueprint: build `pip install -r requirements.txt`, start `python app.py serve --host 0.0.0.0 --port $PORT`. Isi `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, dan `WHATSAPP_NUMBER` lewat dashboard hosting. Di balik HTTPS set `COOKIE_SECURE=true` dan `TRUST_PROXY=true`. Server HTTP bawaan Python cukup untuk beban kecil, tetapi tetap ikuti catatan "Batasan sebelum produksi" di bawah.
 
 ## Cadangan dan pemulihan lokal
 
@@ -117,3 +140,17 @@ Perintah menolak folder tujuan yang sudah ada dan folder dalam direktori data. U
 Ini aplikasi lokal yang dapat dijalankan, bukan klaim siap produksi. Server HTTP bawaan Python ditujukan untuk penggunaan lokal. Peluncuran publik memerlukan server/reverse proxy production, HTTPS, pembatasan unggahan dan request di proxy, konfigurasi host, pemantauan, pencadangan terjadwal dan uji pemulihan, serta peninjauan keamanan. Pembatasan login saat ini di memori proses (10 percobaan/15 menit/IP), sesi bertahan 8 jam, kata sandi di-hash scrypt. Akses tulis membutuhkan sesi dan token CSRF; data internal dikeluarkan dari respons publik. Tidak ada reset kata sandi via email di versi awal.
 
 Foto diperiksa melalui signature dan ukuran, tanpa re-encoding/optimisasi otomatis atau pemindaian file. Foto besar sebaiknya dioptimalkan sebelum unggah. Identitas usaha, nomor kontak, rumah/foto/alamat sebenarnya belum tersedia. Tidak ada pembayaran online maupun integrasi WhatsApp API.
+
+
+## Desain PRD 0.3
+
+Sumber terbaru: `PRD_v0_3.md` (salinan DOCX pengguna). Pengecualian yang dipilih pengguna: objek tetap bangunan dan tanah kosong, beranda tetap hero penuh tanpa pengenalan, cuplikan, dan footer. Arah visual ada di `DESIGN_v0_3.md`.
+
+Layar baru: `/masuk`, `/daftar`, `/akun/profil`, `/akun/pengajuan`, `/akun/pengajuan/pratinjau`, `/akun/sewa`, `/akun/perpanjangan`, dan `/admin/pengajuan`. Semua layar akun dan dokumen baru diberi label pratinjau. Tidak ada login penyewa, unggahan dokumen, nomor referensi, atau konfirmasi pembayaran yang disimulasikan. Katalog tetap terbuka; tombol survei mempertahankan konteks aset menuju rancangan login dan konfirmasi survei. Pengajuan Dipesan tetap nonaktif. Login dan API admin lama tetap berfungsi pada server Python lokal.
+
+Sebelum mengaktifkan alur baru diperlukan backend akun penyewa dan penyimpanan privat, pilihan autentikasi/pemulihan akun, format/batas unggahan, retensi, aturan perpanjangan, serta dua template resmi dari pengelola. Tidak ada template surat atau identitas pribadi fiktif yang dibuat.
+
+
+### Akun demo penyewa
+
+Pada `/masuk`, gunakan username `penyewa.demo` dan kata sandi `DemoPenyewa123!`, atau tombol Isi akun demo. Ini hanya gerbang pratinjau frontend, bukan autentikasi backend. Penanda demo disimpan pada sessionStorage tab (tanpa kata sandi/token), bertahan saat refresh, dan dihapus melalui Keluar akun demo. Tidak memberikan akses dokumen, data admin, atau pengajuan nyata.

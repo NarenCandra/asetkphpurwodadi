@@ -1,8 +1,29 @@
-/* Tambahan untuk akun penyewa dan halaman pengajuan */
+/* Tambahan untuk halaman penyewa yang berfungsi (melengkapi tenant-design.css) */
+.app-card { display: grid; gap: 14px; }
+.app-card-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: flex-start; }
+.app-card h2 { margin-bottom: 6px; }
+.app-card .btn { justify-self: start; }
+.next-action { background: #f1f6ee; border-left: 4px solid #2f5a43; padding: 12px 16px; border-radius: 8px; margin: 4px 0; max-width: none; }
+.stepper { list-style: none; display: flex; gap: 6px; padding: 0; margin: 8px 0; flex-wrap: wrap; }
+.stepper li { flex: 1 1 120px; display: flex; align-items: center; gap: 8px; color: #6b7d70; font-size: .9rem; }
+.stepper .step-dot { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: #e6ece2; font-weight: 700; flex: none; }
+.stepper li.done { color: #174e3c; }
+.stepper li.done .step-dot { background: #2f5a43; color: #fff; }
+.stepper li.current { color: #174e3c; font-weight: 700; }
+.stepper li.current .step-dot { background: #fff; border: 2px solid #2f5a43; }
+.stepper.closed { opacity: .5; }
 .steps { padding-left: 1.25rem; display: grid; gap: 1rem; }
 .steps li { padding-bottom: .75rem; border-bottom: 1px solid rgba(23, 78, 60, .15); }
 .steps li:last-child { border-bottom: 0; }
+.tenant-panel details { margin: .5rem 0; }
+.tenant-panel .form-grid .btn.small { width: auto; justify-self: start; }
+.tenant-auth-form .error { margin-top: 14px; }
 .confirm-modal .admin-actions { flex-wrap: wrap; gap: .5rem; }
 .admin-section details { margin: .5rem 0; }
 .admin-section h3 { margin-top: 1.25rem; }
 #survey-btn, #coop-btn { width: 100%; margin-top: .5rem; text-align: center; }
+.profile-list { display: grid; gap: 12px; margin: 0; }
+.profile-list dt { font-size: .8rem; color: #6b7d70; }
+.profile-list dd { margin: 0; font-weight: 600; }
+.admin-filter.filter-3 { grid-template-columns: minmax(0, 1fr) 230px 230px; }
+@media (max-width: 820px) { .admin-filter.filter-3 { grid-template-columns: 1fr; } }

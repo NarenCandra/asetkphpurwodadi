@@ -562,9 +562,4 @@ body[data-page='catalog'] .catalog-layout select {
   .footer-links { justify-content: flex-start; gap: 6px 25px; width: 100%; border-top: 1px solid #ffffff26; padding-top: 14px; }
 }
 
-/* Navbar sedikit lebih lebar dan lega pada layar desktop (>=1000px); tablet dan mobile tidak berubah. */
-@media (min-width: 1000px) {
-  .header-inner { min-height: 96px; padding-inline: 48px; }
-  .nav { gap: 12px; }
-  .nav a { padding: 13px 26px; font-size: 0.95rem; }
-}
+

@@ -1,23 +1,14 @@
 {
   "name": "sewaruma-local",
   "private": true,
-  "version": "0.2.0",
-  "description": "Katalog aset sewa Perhutani KPH Purwodadi dengan backend Python dan SQLite",
+  "version": "0.1.0",
+  "description": "Katalog rumah sewa lokal dengan backend Python dan SQLite",
   "scripts": {
     "dev": "python app.py serve",
     "start": "python app.py serve",
     "build": "python scripts/check.py",
     "build:demo": "node scripts/build-demo.cjs",
     "lint": "python scripts/check.py",
-    "test": "python -m unittest discover -s tests -v",
-    "test:unit": "vitest run",
-    "test:unit:watch": "vitest",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui",
-    "test:all": "python -m unittest discover -s tests && vitest run && playwright test"
-  },
-  "devDependencies": {
-    "@playwright/test": "^1.56.0",
-    "vitest": "^3.2.0"
+    "test": "python -m unittest discover -s tests -v"
   }
 }

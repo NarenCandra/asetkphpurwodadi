@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS leases (id TEXT PRIMARY KEY, house_id TEXT NOT NULL R
 CREATE TABLE IF NOT EXISTS lease_periods (id TEXT PRIMARY KEY, lease_id TEXT NOT NULL REFERENCES leases(id) ON DELETE CASCADE, application_id TEXT, period TEXT NOT NULL, start_date TEXT NOT NULL, end_date TEXT NOT NULL, created TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS applications (id TEXT PRIMARY KEY, ref TEXT NOT NULL UNIQUE, kind TEXT NOT NULL, user_id TEXT NOT NULL REFERENCES users(id), house_id TEXT NOT NULL REFERENCES houses(id), lease_id TEXT REFERENCES leases(id), status TEXT NOT NULL DEFAULT 'diproses', admin_note TEXT NOT NULL DEFAULT '', payment TEXT NOT NULL DEFAULT 'belum', payment_note TEXT NOT NULL DEFAULT '', ktp_doc_id TEXT, closed INTEGER NOT NULL DEFAULT 0, applied INTEGER NOT NULL DEFAULT 0, created TEXT NOT NULL, updated TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS documents (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), application_id TEXT REFERENCES applications(id), kind TEXT NOT NULL, filename TEXT NOT NULL, original_name TEXT NOT NULL, version INTEGER NOT NULL, status TEXT NOT NULL, reason TEXT NOT NULL DEFAULT '', created TEXT NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_users_email_lower ON users (lower(email));
 CREATE INDEX IF NOT EXISTS idx_app_user ON applications(user_id);
 CREATE INDEX IF NOT EXISTS idx_doc_user ON documents(user_id, kind);
 '''
@@ -75,7 +76,7 @@ def user_json(row):
 
 
 def rate_limit(A, h, bucket):
-    key = f'{bucket}:{h.client_address[0]}'
+    key = f'{bucket}:{A.client_ip(h)}'
     t = time.time()
     with A.RATE_LOCK:
         attempts = [x for x in A.ATTEMPTS.get(key, []) if t - x < 900]
@@ -93,27 +94,32 @@ def start_session(A, h, db, user_row_id, name, email, whatsapp, status=200):
     return status, {'authenticated': True, 'csrf': csrf, 'user': {'id': user_row_id, 'name': name, 'email': email, 'whatsapp': whatsapp}}, cookie(A, token, 28800)
 
 
+def clean_whatsapp(value):
+    wa = re.sub(r'[\s\-+]', '', str(value))
+    if wa.startswith('0'):
+        wa = '62' + wa[1:]
+    if not re.fullmatch(r'62[0-9]{8,13}', wa):
+        raise ValueError('Nomor WhatsApp tidak valid. Contoh: 0812xxxxxxx.')
+    return wa
+
+
 def register(A, h, body):
     key = rate_limit(A, h, 'reg')
     name, email, password = (body.get(k, '') for k in ('name', 'email', 'password'))
-    wa = re.sub(r'[\s\-+]', '', str(body.get('whatsapp', '')))
     if not all(isinstance(x, str) for x in (name, email, password)):
         raise ValueError('Isian pendaftaran tidak valid.')
     name, email = name.strip(), email.strip().lower()
-    if wa.startswith('0'):
-        wa = '62' + wa[1:]
     if not 2 <= len(name) <= 100:
         raise ValueError('Nama wajib diisi (2-100 karakter).')
     if not EMAIL.match(email):
         raise ValueError('Email tidak valid.')
-    if not re.fullmatch(r'62[0-9]{8,13}', wa):
-        raise ValueError('Nomor WhatsApp tidak valid. Contoh: 0812xxxxxxx.')
     if not 8 <= len(password) <= 200:
         raise ValueError('Kata sandi minimal 8 karakter.')
+    wa = clean_whatsapp(body.get('whatsapp', ''))
     salt = secrets.token_hex(16)
     uid = secrets.token_hex(12)
     with A.WRITE_LOCK, A.connect() as db:
-        if db.execute('SELECT 1 FROM users WHERE email=?', (email,)).fetchone():
+        if db.execute('SELECT 1 FROM users WHERE lower(email)=lower(?)', (email,)).fetchone():
             raise ValueError('Email sudah terdaftar. Silakan masuk.')
         db.execute('INSERT INTO users VALUES(?,?,?,?,?,?,?)', (uid, email, name, wa, salt, A.password_hash(password, salt), now()))
         status, payload, extra = start_session(A, h, db, uid, name, email, wa, 201)
@@ -128,7 +134,7 @@ def user_login(A, h, body):
     if not isinstance(email, str) or not isinstance(password, str):
         raise ValueError('Isian login tidak valid.')
     with A.connect() as db:
-        user = db.execute('SELECT * FROM users WHERE email=?', (email.strip(),)).fetchone()
+        user = db.execute('SELECT * FROM users WHERE lower(email)=lower(?)', (email.strip(),)).fetchone()
         computed = A.password_hash(password, user['salt'] if user else '00' * 16)
         if not user or not hmac.compare_digest(computed, user['password_hash']):
             raise Denied(401, 'Email atau kata sandi salah.')
@@ -153,12 +159,13 @@ def read_upload(body):
 
 def add_document(A, db, user_id, application_id, kind, upload):
     raw, ext, name = upload
-    version = db.execute('SELECT COALESCE(MAX(version),0)+1 FROM documents WHERE user_id=? AND application_id IS ? AND kind=?', (user_id, application_id, kind)).fetchone()[0]
+    if application_id is None:
+        version = db.execute('SELECT COALESCE(MAX(version),0)+1 FROM documents WHERE user_id=? AND application_id IS NULL AND kind=?', (user_id, kind)).fetchone()[0]
+    else:
+        version = db.execute('SELECT COALESCE(MAX(version),0)+1 FROM documents WHERE user_id=? AND application_id=? AND kind=?', (user_id, application_id, kind)).fetchone()[0]
     doc_id = secrets.token_hex(16)
-    folder = A.DATA / 'private' / user_id
-    folder.mkdir(parents=True, exist_ok=True)
     filename = f'{user_id}/{doc_id}.{ext}'
-    (A.DATA / 'private' / filename).write_bytes(raw)
+    A.storage.put(A.DATA, 'private', filename, raw, {'pdf': 'application/pdf', 'jpg': 'image/jpeg', 'png': 'image/png'}[ext])
     status = 'tersedia' if kind == 'surat_siap_ttd' else 'menunggu'
     db.execute('INSERT INTO documents(id,user_id,application_id,kind,filename,original_name,version,status,created) VALUES(?,?,?,?,?,?,?,?,?)', (doc_id, user_id, application_id, kind, filename, name, version, status, now()))
     return doc_id
@@ -175,12 +182,45 @@ def latest(db, user_id, kind, application_id=None):
     return db.execute('SELECT * FROM documents WHERE application_id=? AND kind=? ORDER BY version DESC LIMIT 1', (application_id, kind)).fetchone()
 
 
+def progress(db, row):
+    """(langkah, teks tindakan berikutnya) untuk tampilan alur penyewa."""
+    kind, status = row['kind'], row['status']
+    if status in ('ditolak', 'dibatalkan'):
+        return 0, 'Pengajuan ditutup.' if status == 'dibatalkan' else 'Pengajuan ditolak. Lihat catatan pengelola.'
+    if kind == 'survei':
+        text = {'diproses': 'Lanjutkan ke WhatsApp dengan nomor referensi untuk menyepakati jadwal survei.', 'terjadwal': 'Survei sudah dijadwalkan pengelola. Jika setelah survei Anda sepakat, lanjutkan ke permohonan sewa.', 'selesai': 'Survei selesai. Jika sepakat, lanjutkan ke permohonan sewa.'}
+        return {'diproses': 2, 'terjadwal': 3, 'selesai': 3}.get(status, 2), text.get(status, '')
+    if row['applied']:
+        return 4, 'Sewa aktif. Lihat periode di Sewa Saya.'
+    if status == 'disetujui':
+        if row['payment'] == 'lunas':
+            return 3, 'Pelunasan dikonfirmasi. Menunggu pengelola mengaktifkan sewa.' if kind == 'sewa_baru' else 'Pelunasan dikonfirmasi. Menunggu pengelola mencatat perpanjangan.'
+        if row['payment'] == 'dp':
+            return 3, 'DP dikonfirmasi. Lanjutkan pelunasan melalui WhatsApp.'
+        return 3, 'Disetujui. Lanjutkan ke WhatsApp untuk pembayaran.'
+    ktp = db.execute('SELECT * FROM documents WHERE id=?', (row['ktp_doc_id'],)).fetchone() if row['ktp_doc_id'] else None
+    template, signed = latest(db, row['user_id'], 'surat_siap_ttd', row['id']), latest(db, row['user_id'], 'surat_ttd', row['id'])
+    if ktp and ktp['status'] == 'perlu_perbaikan':
+        return 1, 'Perbaiki KTP: ' + (ktp['reason'] or 'lihat catatan pengelola') + '.'
+    if status == 'perlu_perbaikan':
+        return 1, 'Perbaiki berkas: ' + (row['admin_note'] or 'lihat catatan pengelola') + '.'
+    if not template:
+        return 1, 'Menunggu pengelola menyiapkan surat siap tanda tangan.'
+    if not signed:
+        return 1, 'Unduh surat, tandatangani di luar website, lalu unggah hasilnya.'
+    if signed['status'] == 'perlu_perbaikan':
+        return 1, 'Perbaiki surat: ' + (signed['reason'] or 'lihat catatan pengelola') + '.'
+    return 2, 'Berkas lengkap. Menunggu verifikasi pengelola.'
+
+
 def serve_file(A, h, doc):
-    path = (A.DATA / 'private' / doc['filename']).resolve()
-    if not path.is_relative_to((A.DATA / 'private').resolve()) or not path.is_file():
-        raise Denied(404, 'Berkas tidak tersedia.')
-    ctype = {'pdf': 'application/pdf', 'jpg': 'image/jpeg', 'png': 'image/png'}[path.suffix[1:]]
-    h.send(200, path.read_bytes(), ctype, {'Content-Disposition': f'attachment; filename="{doc["kind"]}-v{doc["version"]}.{path.suffix[1:]}"'})
+    try:
+        raw = A.storage.get(A.DATA, 'private', doc['filename'])
+    except FileNotFoundError:
+        raise Denied(404, 'Berkas tidak tersedia.') from None
+    extension = doc['filename'].rsplit('.', 1)[-1]
+    ctype = {'pdf': 'application/pdf', 'jpg': 'image/jpeg', 'png': 'image/png'}[extension]
+    h.send(200, raw, ctype, {'Content-Disposition': f'attachment; filename="{doc["kind"]}-v{doc["version"]}.{extension}"'})
 
 
 # ---------------------------------------------------------- pengajuan ---
@@ -197,6 +237,7 @@ def app_json(db, row, admin=False):
     data['admin_note'] = row['admin_note']
     data['payment_note'] = row['payment_note']
     data['house'] = house_brief(db, row['house_id'])
+    data['step'], data['next'] = progress(db, row)
     if admin:
         u = db.execute('SELECT name,email,whatsapp FROM users WHERE id=?', (row['user_id'],)).fetchone()
         data['tenant'] = dict(u)
@@ -548,7 +589,7 @@ def import_excel(A, body):
 # --------------------------------------------------------------- routing ---
 def dispatch(A, h, method, path):
     """Kembalikan True bila permintaan ditangani modul ini."""
-    if not (path in ('/api/me', '/api/register', '/api/user/login', '/api/user/logout', '/api/admin/import') or path.startswith(('/api/my/', '/api/admin/applications', '/api/admin/documents/'))):
+    if not (path in ('/api/me', '/api/register', '/api/user/login', '/api/user/logout', '/api/admin/import') or path.startswith(('/api/my/', '/api/admin/applications', '/api/admin/documents/', '/api/admin/tenants'))):
         return False
     try:
         route(A, h, method, path)
@@ -556,8 +597,11 @@ def dispatch(A, h, method, path):
         h.send(error.status, {'error': str(error)})
     except (ValueError, TypeError, KeyError) as error:
         h.send(400, {'error': str(error) if isinstance(error, ValueError) else 'Permintaan tidak valid.'})
-    except A.sqlite3.IntegrityError:
+    except A.database.INTEGRITY_ERRORS:
         h.send(400, {'error': 'Data bertabrakan dengan data yang sudah ada.'})
+    except A.storage.StorageError as error:
+        print('Storage:', error, flush=True)
+        h.send(502, {'error': 'Penyimpanan berkas sedang bermasalah. Coba lagi.'})
     return True
 
 
@@ -599,6 +643,15 @@ def route(A, h, method, path):
 
 def route_tenant(A, h, method, path, user):
     uid = user['uid']
+    if path == '/api/my/profile' and method == 'PUT':
+        body = h.json_body(20000)
+        name = body.get('name')
+        if not isinstance(name, str) or not 2 <= len(name.strip()) <= 100:
+            raise ValueError('Nama wajib diisi (2-100 karakter).')
+        wa = clean_whatsapp(body.get('whatsapp', ''))
+        with A.WRITE_LOCK, A.connect() as db:
+            db.execute('UPDATE users SET name=?,whatsapp=? WHERE id=?', (name.strip(), wa, uid))
+        return h.send(200, {'authenticated': True, 'csrf': user['csrf'], 'user': {'id': uid, 'name': name.strip(), 'email': user['email'], 'whatsapp': wa}})
     if path == '/api/my/ktp':
         if method == 'GET':
             with A.connect() as db:
@@ -669,7 +722,33 @@ def route_tenant(A, h, method, path, user):
     raise Denied(404, 'Tidak ditemukan.')
 
 
+def tenant_json(db, u):
+    ktp = latest(db, u['id'], 'ktp')
+    total, open_count = db.execute('SELECT COUNT(*), COALESCE(SUM(CASE WHEN closed=0 THEN 1 ELSE 0 END),0) FROM applications WHERE user_id=?', (u['id'],)).fetchone()
+    return {'id': u['id'], 'name': u['name'], 'email': u['email'], 'whatsapp': u['whatsapp'], 'created': u['created'], 'ktp': doc_json(ktp, True) if ktp else None, 'applications': total, 'open': open_count}
+
+
 def route_admin(A, h, method, path):
+    if path == '/api/admin/tenants' and method == 'GET':
+        text = parse_qs(urlparse(h.path).query).get('q', [''])[0].strip()
+        sql, args = 'SELECT * FROM users WHERE 1=1', []
+        if text:
+            sql += ' AND (LOWER(name) LIKE LOWER(?) OR LOWER(email) LIKE LOWER(?) OR whatsapp LIKE ?)'
+            args += [f'%{text}%'] * 3
+        with A.connect() as db:
+            rows = db.execute(sql + ' ORDER BY created DESC LIMIT 500', args).fetchall()
+            return h.send(200, [tenant_json(db, u) for u in rows])
+    match = re.fullmatch(r'/api/admin/tenants/([a-f0-9]+)', path)
+    if match and method == 'GET':
+        with A.connect() as db:
+            u = db.execute('SELECT * FROM users WHERE id=?', (match[1],)).fetchone()
+            if not u:
+                raise Denied(404, 'Penyewa tidak ditemukan.')
+            data = tenant_json(db, u)
+            data['ktp_versions'] = [doc_json(d, True) for d in db.execute("SELECT * FROM documents WHERE user_id=? AND kind='ktp' ORDER BY version DESC", (u['id'],))]
+            data['application_list'] = [app_json(db, a, True) for a in db.execute('SELECT * FROM applications WHERE user_id=? ORDER BY created DESC', (u['id'],))]
+            data['leases'] = [lease_json(db, l) for l in db.execute('SELECT * FROM leases WHERE user_id=? ORDER BY created DESC', (u['id'],))]
+            return h.send(200, data)
     if path == '/api/admin/import' and method == 'POST':
         return h.send(200, import_excel(A, h.json_body()))
     if path == '/api/admin/applications' and method == 'GET':
@@ -681,16 +760,18 @@ def route_admin(A, h, method, path):
                 args.append(query[key][0])
         text = query.get('q', [''])[0].strip()
         if text:
-            sql += ' AND (a.ref LIKE ? OR u.name LIKE ? OR u.email LIKE ?)'
+            sql += ' AND (LOWER(a.ref) LIKE LOWER(?) OR LOWER(u.name) LIKE LOWER(?) OR LOWER(u.email) LIKE LOWER(?))'
             args += [f'%{text}%'] * 3
         with A.connect() as db:
             rows = db.execute(sql + ' ORDER BY a.created DESC LIMIT 500', args).fetchall()
             result = []
             for r in rows:
                 item = app_json(db, r, True)
-                ids = [r['ktp_doc_id']] if r['ktp_doc_id'] else []
+                ktp = latest(db, r['user_id'], 'ktp')
+                ids = [ktp['id']] if ktp else []
                 ids += [d['id'] for d in db.execute('SELECT id FROM documents WHERE application_id=?', (r['id'],))]
                 item['pending_documents'] = sum(1 for i in ids if db.execute("SELECT 1 FROM documents WHERE id=? AND status='menunggu'", (i,)).fetchone())
+                item['ktp_status'] = ktp['status'] if ktp else None
                 result.append(item)
         return h.send(200, result)
     match = re.fullmatch(r'/api/admin/documents/([a-f0-9]+)(/file)?', path)

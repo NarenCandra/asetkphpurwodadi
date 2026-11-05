@@ -22,6 +22,8 @@ from pathlib import Path
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+import db as database
+import storage
 import tenant
 
 ROOT = Path(__file__).resolve().parent
@@ -38,24 +40,33 @@ RATE_LOCK = threading.Lock()
 ATTEMPTS = {}
 
 
-class ClosingConnection(sqlite3.Connection):
-    def __exit__(self, *args):
-        try:
-            return super().__exit__(*args)
-        finally:
-            self.close()
+OWN_TABLES = ('admin', 'sessions', 'houses', 'photos', 'users', 'user_sessions', 'leases', 'lease_periods', 'applications', 'documents')
 
 
 def connect():
-    db = sqlite3.connect(DB, timeout=15, factory=ClosingConnection)
-    db.row_factory = sqlite3.Row
-    db.execute('PRAGMA foreign_keys=ON')
-    return db
+    return database.connect(DB)
+
+
+def secure_postgres(db):
+    """Supabase membuka tabel schema public lewat REST API. RLS tanpa kebijakan = tertutup untuk anon/authenticated;
+    backend memakai peran pemilik tabel yang tidak terkena RLS."""
+    for table in OWN_TABLES:
+        db.execute(f'ALTER TABLE {table} ENABLE ROW LEVEL SECURITY')
+
+
+def client_ip(handler):
+    """IP klien. Di balik proxy hosting, set TRUST_PROXY=true agar memakai X-Forwarded-For."""
+    if os.environ.get('TRUST_PROXY', 'false').lower() == 'true':
+        forwarded = handler.headers.get('X-Forwarded-For', '').split(',')[0].strip()
+        if forwarded:
+            return forwarded
+    return handler.client_address[0]
 
 
 def init_db():
     DATA.mkdir(parents=True, exist_ok=True)
-    (DATA / 'uploads').mkdir(exist_ok=True)
+    if not storage.remote():
+        (DATA / 'uploads').mkdir(exist_ok=True)
     with connect() as db:
         db.executescript('''
         PRAGMA journal_mode=WAL;
@@ -63,8 +74,13 @@ def init_db():
         CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, csrf TEXT NOT NULL, expires INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS houses (id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE COLLATE NOCASE, body TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1);
         CREATE TABLE IF NOT EXISTS photos (id TEXT PRIMARY KEY, house_id TEXT NOT NULL REFERENCES houses(id) ON DELETE CASCADE, filename TEXT NOT NULL, position INTEGER NOT NULL);
+        CREATE INDEX IF NOT EXISTS idx_photos_house_position ON photos (house_id, position, id);
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_houses_code_lower ON houses (lower(code));
         ''')
         tenant.init(db)
+        if database.using_postgres():
+            secure_postgres(db)
+    storage.ensure()
 
 
 def password_hash(password, salt):
@@ -107,16 +123,46 @@ def config():
     }
 
 
-def house_record(db, row, admin=False):
+def house_record(db, row, admin=False, photos=None):
     house = json.loads(row['body'])
     house.update(id=row['id'], revision=row['revision'])
-    house['photos'] = [dict(id=p['id'], url='/media/' + p['id']) for p in db.execute('SELECT * FROM photos WHERE house_id=? ORDER BY position,id', (row['id'],))]
+    if photos is None:
+        photo_rows = db.execute(
+            'SELECT id FROM photos WHERE house_id=? ORDER BY position,id',
+            (row['id'],)
+        ).fetchall()
+        photos = [dict(id=p['id'], url='/media/' + p['id']) for p in photo_rows]
+    house['photos'] = photos
     if admin:
         house['notice'] = lease_notice(house)
     else:
         for key in tenant.INTERNAL_KEYS:
             house.pop(key, None)
     return house
+
+
+def house_records(db, rows, admin=False):
+    """Bangun daftar rumah dengan satu query foto, bukan satu query per rumah."""
+    if not rows:
+        return []
+    ids = [row['id'] for row in rows]
+    placeholders = ','.join('?' for _ in ids)
+    photo_rows = db.execute(
+        f'SELECT id, house_id FROM photos WHERE house_id IN ({placeholders}) ORDER BY house_id, position, id',
+        ids
+    ).fetchall()
+    photos_by_house = {}
+    for photo in photo_rows:
+        photos_by_house.setdefault(photo['house_id'], []).append(
+            dict(id=photo['id'], url='/media/' + photo['id'])
+        )
+    result = []
+    for row in rows:
+        body = json.loads(row['body'])
+        if not admin and body.get('status') not in ('Tersedia', 'Dipesan'):
+            continue
+        result.append(house_record(db, row, admin, photos_by_house.get(row['id'], [])))
+    return result
 
 
 def validate_house(body, previous=None, photo_count=0):
@@ -282,7 +328,10 @@ class Handler(BaseHTTPRequestHandler):
                 with connect() as db:
                     identifier = path.rsplit('/', 1)[-1]
                     rows = db.execute('SELECT * FROM houses' + (' WHERE id=?' if identifier != 'houses' else ''), (identifier,) if identifier != 'houses' else ()).fetchall()
-                    result = [house_record(db, row, admin) for row in rows if admin or json.loads(row['body'])['status'] in ('Tersedia', 'Dipesan')]
+                    if identifier == 'houses':
+                        result = house_records(db, rows, admin)
+                    else:
+                        result = [house_record(db, row, admin) for row in rows if admin or json.loads(row['body'])['status'] in ('Tersedia', 'Dipesan')]
                 if identifier != 'houses':
                     return self.send(200, result[0]) if result else self.send(404, {'error': 'Properti tidak tersedia'})
                 result.sort(key=lambda h: (h['status'] != 'Tersedia', h['name']))
@@ -292,8 +341,14 @@ class Handler(BaseHTTPRequestHandler):
                     photo = db.execute('SELECT p.*,h.body FROM photos p JOIN houses h ON h.id=p.house_id WHERE p.id=?', (path.split('/')[-1],)).fetchone()
                 if not photo or (json.loads(photo['body'])['status'] not in ('Tersedia', 'Dipesan') and not self.session()):
                     return self.send(404, {'error': 'Foto tidak tersedia.'})
-                file = DATA / 'uploads' / photo['filename']
-                return self.send(200, file.read_bytes(), mimetypes.guess_type(file.name)[0] or 'application/octet-stream')
+                try:
+                    raw = storage.get(DATA, 'uploads', photo['filename'])
+                except FileNotFoundError:
+                    return self.send(404, {'error': 'Foto tidak tersedia.'})
+                except storage.StorageError as error:
+                    print('Storage:', error, flush=True)
+                    return self.send(502, {'error': 'Penyimpanan foto sedang bermasalah.'})
+                return self.send(200, raw, mimetypes.guess_type(photo['filename'])[0] or 'application/octet-stream')
             if path.startswith('/assets/'):
                 file = (ROOT / 'public' / path.lstrip('/')).resolve()
                 if not file.is_relative_to(ROOT / 'public' / 'assets') or not file.is_file():
@@ -370,7 +425,7 @@ class Handler(BaseHTTPRequestHandler):
                         raise ValueError('Gunakan foto JPEG, PNG, atau WebP maksimal 8 MB.')
                     photo_id = secrets.token_hex(16)
                     filename = photo_id + extension
-                    (DATA / 'uploads' / filename).write_bytes(raw)
+                    storage.put(DATA, 'uploads', filename, raw, mimetypes.guess_type(filename)[0] or 'application/octet-stream')
                     position = db.execute('SELECT COALESCE(MAX(position),-1)+1 FROM photos WHERE house_id=?', (identifier,)).fetchone()[0]
                     db.execute('INSERT INTO photos VALUES(?,?,?,?)', (photo_id, identifier, filename, position))
                     db.execute('UPDATE houses SET revision=revision+1 WHERE id=?', (identifier,))
@@ -385,7 +440,10 @@ class Handler(BaseHTTPRequestHandler):
                     db.execute('UPDATE houses SET revision=revision+1 WHERE id=?', (identifier,))
                     # Defer file deletion until the database transaction commits.
                     db.commit()
-                    (DATA / 'uploads' / photo['filename']).unlink(missing_ok=True)
+                    try:
+                        storage.delete(DATA, 'uploads', photo['filename'])
+                    except storage.StorageError as error:
+                        print('Storage:', error, flush=True)
                     return self.send(200, {'ok': True})
                 if action == '/photo-order' and method == 'PUT':
                     ids = body.get('ids', [])
@@ -398,14 +456,17 @@ class Handler(BaseHTTPRequestHandler):
                     db.commit()
                     return self.send(200, {'ok': True})
                 return self.send(405, {'error': 'Metode tidak diizinkan.'})
-        except sqlite3.IntegrityError:
+        except database.INTEGRITY_ERRORS:
             return self.send(400, {'error': 'Kode rumah sudah dipakai.'})
+        except storage.StorageError as error:
+            print('Storage:', error, flush=True)
+            return self.send(502, {'error': 'Penyimpanan berkas sedang bermasalah. Coba lagi.'})
         except (ValueError, TypeError) as error:
             return self.send(400, {'error': str(error)})
 
     def login(self, body):
         now = time.time()
-        address = self.client_address[0]
+        address = client_ip(self)
         with RATE_LOCK:
             attempts = [t for t in ATTEMPTS.get(address, []) if now - t < 900]
             if len(attempts) >= 10:
@@ -429,11 +490,44 @@ class Handler(BaseHTTPRequestHandler):
         return self.send(200, {'authenticated': True, 'csrf': csrf}, extra={'Set-Cookie': f'session={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800{secure}'})
 
 
+def db_check():
+    """Diagnostik koneksi database dan penyimpanan berkas (aman dijalankan berulang)."""
+    print(f'Database : {database.backend_name()}')
+    print(f'Berkas   : {storage.backend_name()}')
+    try:
+        init_db()
+        print('Skema    : OK (tabel siap)')
+        if database.using_postgres():
+            with connect() as db:
+                open_tables = [r[0] for r in db.execute('SELECT relname FROM pg_class WHERE relkind=? AND relname IN (' + ','.join('?' * len(OWN_TABLES)) + ') AND NOT relrowsecurity', ('r', *OWN_TABLES)).fetchall()]
+            if open_tables:
+                raise RuntimeError('RLS belum aktif pada: ' + ', '.join(open_tables))
+            print('Keamanan : RLS aktif pada semua tabel (anon key tidak dapat membaca data)')
+        with connect() as db:
+            houses = db.execute('SELECT COUNT(*) FROM houses').fetchone()[0]
+            tenants = db.execute('SELECT COUNT(*) FROM users').fetchone()[0]
+        print(f'Data     : {houses} aset, {tenants} penyewa')
+        probe = 'db-check/uji.txt'
+        storage.put(DATA, 'private', probe, b'ok', 'text/plain')
+        if storage.get(DATA, 'private', probe) != b'ok':
+            raise RuntimeError('Isi berkas uji tidak cocok.')
+        storage.delete(DATA, 'private', probe)
+        print('Storage  : unggah, unduh, hapus OK')
+    except Exception as error:  # diagnostik: tampilkan penyebab apa adanya
+        print(f'GAGAL    : {type(error).__name__}: {error}')
+        if database.using_postgres():
+            print('Periksa: DATABASE_URL (gunakan Connection string Supabase), kata sandi, dan paket psycopg (pip install "psycopg[binary]").')
+        if storage.remote():
+            print('Periksa: SUPABASE_URL dan SUPABASE_SERVICE_ROLE_KEY.')
+        raise SystemExit(1) from None
+    print('Semua pemeriksaan berhasil.')
+
+
 def main():
     parser = argparse.ArgumentParser(description='Website penyewaan rumah lokal')
-    parser.add_argument('command', choices=['serve', 'init', 'create-admin', 'seed-demo', 'backup'], nargs='?', default='serve')
+    parser.add_argument('command', choices=['serve', 'init', 'create-admin', 'seed-demo', 'backup', 'db-check'], nargs='?', default='serve')
     parser.add_argument('--port', type=int, default=int(os.environ.get('PORT', 8000)))
-    parser.add_argument('--host', default='127.0.0.1')
+    parser.add_argument('--host', default=os.environ.get('HOST', '127.0.0.1'))
     parser.add_argument('--output', help='Folder cadangan baru')
     parser.add_argument('--append', action='store_true', help='seed-demo: tambahkan contoh tanpa menghapus data yang ada')
     args = parser.parse_args()
@@ -454,16 +548,22 @@ def main():
     elif args.command == 'seed-demo':
         from seed import seed_demo
         seed_demo(args.append)
+    elif args.command == 'db-check':
+        db_check()
     elif args.command == 'backup':
         if not args.output:
             raise SystemExit('Gunakan --output dengan folder cadangan baru. Hentikan server terlebih dahulu.')
+        if database.using_postgres():
+            raise SystemExit('Database ada di Supabase: gunakan Database > Backups di dashboard Supabase. Perintah ini hanya untuk mode SQLite lokal.')
         destination = Path(args.output).resolve()
         if destination.exists() or destination.is_relative_to(DATA):
             raise SystemExit('Gunakan folder baru di luar direktori data.')
         destination.mkdir(parents=True)
-        with connect() as source, sqlite3.connect(destination / DB.name, factory=ClosingConnection) as target:
+        with connect() as source, sqlite3.connect(destination / DB.name, factory=database.ClosingConnection) as target:
             source.backup(target)
-        shutil.copytree(DATA / 'uploads', destination / 'uploads')
+        for folder in ('uploads', 'private'):
+            if (DATA / folder).exists():
+                shutil.copytree(DATA / folder, destination / folder)
         print('Cadangan database dan foto selesai.')
     else:
         if os.environ.get('LOCAL_ADMIN_DEMO', 'false').lower() == 'true' and args.host not in ('127.0.0.1', 'localhost', '::1'):

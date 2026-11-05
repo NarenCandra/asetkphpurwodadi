@@ -140,6 +140,15 @@ class TenantTests(unittest.TestCase):
         self.assertEqual(c2.call('/api/user/login', 'POST', {'email': 'dobel@contoh.id', 'password': 'salah-salah'})[0], 401)
         self.assertEqual(c2.call('/api/user/login', 'POST', {'email': 'dobel@contoh.id', 'password': 'rahasia-uji-1'})[0], 200)
 
+    def test_profile_update(self):
+        t = self.tenant()
+        self.assertEqual(t.call('/api/my/profile', 'PUT', {'name': 'X', 'whatsapp': '0812345678'})[0], 400)
+        self.assertEqual(t.call('/api/my/profile', 'PUT', {'name': 'Budi Baru', 'whatsapp': '12'})[0], 400)
+        s, d = t.call('/api/my/profile', 'PUT', {'name': 'Budi Baru', 'whatsapp': '0857 1111 2222'})
+        self.assertEqual((s, d['user']['whatsapp']), (200, '6285711112222'))
+        self.assertEqual(t.call('/api/me')[1]['user']['name'], 'Budi Baru')
+        self.assertEqual(Client(self.port).call('/api/my/profile', 'PUT', {'name': 'Budi', 'whatsapp': '0812345678'})[0], 401)
+
     def test_requires_login_and_csrf(self):
         anon = Client(self.port)
         for path in ('/api/my/applications', '/api/my/leases', '/api/my/ktp'):
@@ -293,6 +302,34 @@ class TenantTests(unittest.TestCase):
         public = Client(self.port).call(f'/api/houses/{hid}')[1]
         for key in ('real_2025', 'estimasi_2026', 'keterangan', 'import_key'):
             self.assertNotIn(key, public)
+
+    def test_admin_sees_tenant_ktp_and_progress(self):
+        a, t = self.admin(), self.tenant('ktp-admin@contoh.id')
+        self.assertEqual(Client(self.port).call('/api/admin/tenants')[0], 401)
+        self.assertEqual(t.call('/api/admin/tenants')[0], 401)
+        self.upload(t, '/api/my/ktp')  # KTP diunggah dari Dokumen Saya, belum ada pengajuan
+        rows = a.call('/api/admin/tenants?q=ktp-admin')[1]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual((rows[0]['ktp']['status'], rows[0]['applications']), ('menunggu', 0))
+        detail = a.call('/api/admin/tenants/' + rows[0]['id'])[1]
+        s, data, _ = a.call(detail['ktp_versions'][0]['url'], raw=True)
+        self.assertEqual((s, data), (200, PDF))
+        self.assertEqual(a.call(f"/api/admin/documents/{detail['ktp_versions'][0]['id']}", 'PUT', {'status': 'terverifikasi'})[0], 200)
+        self.assertEqual(t.call('/api/my/ktp')[1]['latest']['status'], 'terverifikasi')
+        # KTP menunggu terlihat di daftar pengajuan walau pengajuannya survei
+        hid = self.house(a, 'PRG-1')
+        _, survey = t.call('/api/my/applications', 'POST', {'kind': 'survei', 'house_id': hid})
+        self.assertEqual((survey['step'], 'WhatsApp' in survey['next']), (2, True))
+        listed = next(r for r in a.call('/api/admin/applications?q=ktp-admin')[1] if r['id'] == survey['id'])
+        self.assertEqual(listed['ktp_status'], 'terverifikasi')
+        a.call(f"/api/admin/applications/{survey['id']}", 'PUT', {'status': 'selesai'})
+        self.assertEqual(t.call(f"/api/my/applications/{survey['id']}")[1]['step'], 3)
+        _, form = t.call('/api/my/applications', 'POST', {'kind': 'sewa_baru', 'house_id': hid})
+        self.assertIn('menyiapkan surat', form['next'])
+        self.upload(a, f"/api/admin/applications/{form['id']}/documents")
+        self.assertIn('tandatangani', t.call(f"/api/my/applications/{form['id']}")[1]['next'])
+        self.upload(t, f"/api/my/applications/{form['id']}/documents")
+        self.assertEqual(t.call(f"/api/my/applications/{form['id']}")[1]['step'], 2)
 
     def test_excel_import(self):
         a = self.admin()

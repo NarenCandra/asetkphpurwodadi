@@ -1,0 +1,28 @@
+# Blueprint Render (opsional). Isi variabel bertanda sync:false lewat dashboard Render, bukan di file ini.
+services:
+  - type: web
+    name: sewaruma
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py serve --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/config
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.3
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: TRUST_PROXY
+        value: "true"
+      - key: TIMEZONE
+        value: Asia/Jakarta
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: WHATSAPP_NUMBER
+        sync: false
+      - key: BUSINESS_NAME
+        value: Sewa Aset Perhutani KPH Purwodadi

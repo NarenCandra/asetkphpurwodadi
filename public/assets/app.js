@@ -161,12 +161,17 @@ function shell(content, title='Sewa aset') {
 function landing() {
   const available = state.houses.filter(h => h.status==='Tersedia');
   const hero = available.find(h => h.photos.length) || state.houses.find(h => h.photos.length);
-  shell(`<div class="container hero"><div class="hero-copy"><h1>Temukan Bangunan dan Tanah Sesuai Kebutuhan Anda</h1><p>Jelajahi pilihan bangunan dan tanah kosong yang disewakan oleh Opset Perhutani KPH Purwodadi.</p><a class="btn" href="/rumah">Jelajahi Aset</a></div><div class="hero-visual">${hero?photo(hero,0,true):'<div class="placeholder">Foto utama akan tampil setelah aset dipublikasikan.</div>'}</div></div>`, 'Beranda');
+  const legacySlides = [
+    {url:'/assets/hero/house-1.jpg',alt:'Ilustrasi rumah joglo kayu dengan halaman'},
+    {url:'/assets/hero/house-2.jpg',alt:'Ilustrasi rumah limasan dengan taman'},
+    {url:'/assets/hero/house-3.jpg',alt:'Ilustrasi rumah bergaya kolonial tropis'},
+  ];
+  shell(`<div class="container hero"><div class="hero-copy"><h1>Temukan Bangunan dan Tanah Sesuai Kebutuhan Anda</h1><p>Jelajahi pilihan bangunan dan tanah kosong yang disewakan oleh Opset Perhutani KPH Purwodadi.</p><a class="btn" href="/rumah">Jelajahi Aset</a></div><div class="hero-visual">${hero?photo(hero,0,true):`<img src="${legacySlides[0].url}" alt="${legacySlides[0].alt}" fetchpriority="high" decoding="async">`}</div>${hero?'':'<span class="hero-image-caption">Foto ilustrasi, bukan dokumentasi aset yang ditawarkan.</span>'}</div>`, 'Beranda');
   $('.site-footer').remove();
   const slideshowHouses = available.some(h=>h.photos.length) ? available : state.houses;
   const slides = slideshowHouses.flatMap(h=>h.photos.slice(0,1).map(p=>({url:p.url,alt:h.name})));
   if (slides.length===1 && hero) slides.push(...hero.photos.slice(1).map(p=>({url:p.url,alt:hero.name})));
-  startHeroSlideshow(slides);
+  startHeroSlideshow(slides.length ? slides : legacySlides);
 }
 function startHeroSlideshow(slides) {
   slides = slides.slice(0,5);

@@ -168,6 +168,7 @@ h1, h2, h3 { font-weight: 500; }
 }
 
 /* Landing: the house photograph is the backdrop of the entire opening. */
+body[data-view='home'] .hero-image-caption { position: absolute; z-index: 2; right: 24px; bottom: 16px; max-width: calc(100% - 48px); color: #fff; background: rgb(15 42 27 / .75); border-radius: 6px; padding: 6px 10px; font-size: .75rem; line-height: 1.5; }
 body[data-view='home'] .hero-visual > .hero-slide { position: absolute; inset: 0; opacity: 0; transition: opacity 1.2s ease; animation: none; }
 body[data-view='home'] .hero-visual > .hero-slide.is-active { opacity: 1; }
 body[data-view='home'] .hero { position: relative; grid-template-columns: 1fr; gap: 0; width: 100%; max-width: none; min-height: calc(100svh - 88px); margin: 0; border-radius: 0; overflow: hidden; background: var(--green-dark); }

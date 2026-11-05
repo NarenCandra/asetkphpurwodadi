@@ -9,7 +9,6 @@ let navigationId = 0;
 let toastTimer;
 let cleanNavigation = () => {};
 let cleanHero = () => {};
-let pageTransition = null;
 let pageEntrance = null;
 let pageRequest = 0;
 const icon = '<span class="brand-icon" aria-hidden="true"><img src="/assets/perhutani-forest-logo.png" alt="" width="32" height="32"></span>';
@@ -23,6 +22,25 @@ function glyph(name) {
 }
 
 let demoDataPromise;
+let publicHousesCache = null;
+let publicHousesRequest = null;
+let publicHousesVersion = 0;
+function invalidatePublicHouses() {
+  publicHousesVersion++;
+  publicHousesCache = null;
+  publicHousesRequest = null;
+}
+async function loadPublicHouses() {
+  if (publicHousesCache && Date.now() - publicHousesCache.at < 30000) return publicHousesCache.data;
+  if (publicHousesRequest) return publicHousesRequest;
+  const version = publicHousesVersion;
+  const pending = api('/api/houses').then(data => {
+    if (version === publicHousesVersion) publicHousesCache = {at:Date.now(),data};
+    return data;
+  }).finally(() => { if (publicHousesRequest === pending) publicHousesRequest = null; });
+  publicHousesRequest = pending;
+  return pending;
+}
 const csrfFor = path => /^\/api\/(my|user|register)/.test(path) ? state.user?.csrf : state.session.csrf;
 async function api(path, options={}) {
   if (window.SEWARUMA_STATIC_DEMO) {
@@ -54,6 +72,7 @@ async function api(path, options={}) {
     else if (response.status === 401 && path !== '/api/login') state.session = {authenticated:false};
     throw new Error(data.error || 'Permintaan gagal. Coba kembali.');
   }
+  if (options.method && options.method !== 'GET') invalidatePublicHouses();
   return data;
 }
 function toast(message) {
@@ -446,7 +465,7 @@ async function route() {
       if(path==='/admin/rumah/baru')return editor();
       if(/^\/admin\/rumah\/[a-f0-9]+$/.test(path)){const house=await api('/api/admin/houses/'+path.split('/').pop());if(id===navigationId)editor(house);return;}
     }else if(path==='/'||path==='/rumah'){
-      state.houses=await api('/api/houses');if(id!==navigationId)return;
+      state.houses=await loadPublicHouses();if(id!==navigationId)return;
       return path==='/'?landing():catalog();
     }else if(path==='/tentang')return about();
     else if(/^\/rumah\/[a-f0-9]+$/.test(path)){const house=await api('/api/houses/'+path.split('/').pop());if(id===navigationId)detail(house);return;}
@@ -456,7 +475,6 @@ async function route() {
 function transitionToPage(resetScroll=false) {
   const request=++pageRequest;
   ++navigationId;
-  pageTransition?.skipTransition();
   pageEntrance?.cancel();
   const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
   const update=async()=>{
@@ -465,22 +483,14 @@ function transitionToPage(resetScroll=false) {
     if(request!==pageRequest)return;
     if(resetScroll)window.scrollTo(0,0);
   };
-  if(document.startViewTransition && !reduced) {
-    const transition=document.startViewTransition(update);
-    pageTransition=transition;
-    transition.ready.catch(()=>{});
-    const clear=()=>{if(pageTransition===transition)pageTransition=null;};
-    transition.finished.then(clear,clear);
-  } else {
-    update().then(()=>{
+  update().then(()=>{
       if(!reduced && request===pageRequest && $('#main')?.animate) {
         pageEntrance=$('#main').animate([
           {opacity:0},
           {opacity:1}
-        ],{duration:480,easing:'cubic-bezier(.22,.61,.36,1)'});
+        ],{duration:180,easing:'cubic-bezier(.22,.61,.36,1)'});
       }
-    });
-  }
+  });
 }
 function navigate(path){history.pushState({},'',path);transitionToPage(true);}
 document.addEventListener('click',async e=>{
@@ -503,7 +513,7 @@ document.addEventListener('click',async e=>{
     const wave=ripple.animate([{transform:'scale(0)',opacity:.7},{transform:'scale(1)',opacity:0}],{duration:450,easing:'ease-out',fill:'forwards'});
     wave.finished.then(()=>ripple.remove(),()=>ripple.remove());
     const press=a.animate([{transform:'scale(1)'},{transform:'scale(.95)',offset:.4},{transform:'scale(1)'}],{duration:220,easing:'ease-out'});
-    try {await press.finished;} catch { /* Continue navigation if the browser cancels the press effect. */ }
+    press.finished.catch(()=>{});
     a.removeAttribute('aria-busy');
     if(!a.isConnected || navigationId!==currentNavigation)return;
   }

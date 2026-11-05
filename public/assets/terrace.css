@@ -490,7 +490,7 @@ body[data-view='home'] .site-header,
 }
 ::view-transition-image-pair(page-content) { isolation: isolate; }
 ::view-transition-old(page-content) { display: none; animation: none; }
-::view-transition-new(page-content) { animation: page-arrive .48s cubic-bezier(.22,.61,.36,1) both; mix-blend-mode: normal; z-index: 2; }
+::view-transition-new(page-content) { animation: page-arrive .18s cubic-bezier(.22,.61,.36,1) both; mix-blend-mode: normal; z-index: 2; }
 ::view-transition-group(page-content) { animation: none; }
 ::view-transition { pointer-events: none; }
 @media (prefers-reduced-motion:reduce) {

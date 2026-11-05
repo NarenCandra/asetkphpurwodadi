@@ -1,6 +1,7 @@
 import {databasePool} from './database.mjs';
 import {HttpError, check, equal, token, hex, sha, passwordHash, internalKeys, leaseNotice, validateHouse, cleanWhatsapp, readUpload, contentType, now} from './domain.mjs';
 import {tenantRoute} from './tenant.mjs';
+import {storageKey} from './storage-config.mjs';
 
 const responseHeaders = {'Cache-Control':'no-store', 'X-Content-Type-Options':'nosniff', 'X-Frame-Options':'DENY'};
 export const json = (body, status = 200, extra = {}) => new Response(JSON.stringify(body), {status, headers:{...responseHeaders, 'Content-Type':'application/json; charset=utf-8', ...extra}});
@@ -11,7 +12,7 @@ export function publicConfig() {
 
 export async function storage(method, bucket, filename, raw, type) {
   const base = process.env.SUPABASE_URL?.trim().replace(/\/$/, '');
-  const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = storageKey();
   check(base && key, 'Konfigurasi penyimpanan Supabase belum lengkap di Netlify.', 503);
   check(new URL(base).protocol === 'https:', 'Konfigurasi Supabase tidak valid.', 503);
   check(!filename.split('/').some(p => !p || p === '..' || p === '.'), 'Nama berkas tidak valid.');
@@ -77,12 +78,14 @@ export function contextFor(request, client) {
 }
 
 async function houseList(c, admin, id) {
-  const rows = await c.q('SELECT * FROM houses' + (id ? ' WHERE id=$1' : ''), id ? [id] : []);
-  const photos = rows.length ? await c.q('SELECT id,house_id FROM photos WHERE house_id=ANY($1::text[]) ORDER BY position,id', [rows.map(x=>x.id)]) : [];
+  const conditions = [];
+  if (id) conditions.push('h.id=$1');
+  if (!admin) conditions.push("h.body::json->>'status' IN ('Tersedia','Dipesan')");
+  const rows = await c.q("SELECT h.*, COALESCE((SELECT json_agg(json_build_object('id',p.id,'url','/media/'||p.id) ORDER BY p.position,p.id) FROM photos p WHERE p.house_id=h.id),'[]'::json) AS photos FROM houses h" + (conditions.length ? ' WHERE '+conditions.join(' AND ') : ''), id ? [id] : []);
   const result = rows.flatMap(row => {
     const house = JSON.parse(row.body);
     if (!admin && !['Tersedia','Dipesan'].includes(house.status)) return [];
-    Object.assign(house,{id:row.id,revision:row.revision,photos:photos.filter(p=>p.house_id===row.id).map(p=>({id:p.id,url:'/media/'+p.id}))});
+    Object.assign(house,{id:row.id,revision:row.revision,photos:row.photos});
     if (admin) house.notice = leaseNotice(house);
     else for (const key of internalKeys) delete house[key];
     return [house];
@@ -173,6 +176,11 @@ export async function handleRequest(request, {ip = '', pool: injectedPool} = {})
     if (request.method !== 'GET' && origin) check(origin === url.origin,'Asal permintaan tidak diizinkan.',403);
     const path = url.pathname.replace(/^\/\.netlify\/functions\/api(?=\/|$)/,'');
     if (path === '/api/config' && request.method === 'GET') return json(publicConfig());
+    if (request.method === 'GET' && ['/api/session','/api/me'].includes(path)) {
+      const cookieName = path === '/api/session' ? 'session' : 'usession';
+      const hasCookie = (request.headers.get('cookie') || '').split(';').some(value=>value.trim().startsWith(cookieName+'=') && value.trim().slice(cookieName.length+1));
+      if (!hasCookie) return json({authenticated:false,csrf:null,...(path === '/api/me' ? {user:null} : {})});
+    }
     const pool = injectedPool || databasePool();
     client = await pool.connect();
     // Persist rate limits in the existing sessions table, across function instances.
@@ -184,11 +192,13 @@ export async function handleRequest(request, {ip = '', pool: injectedPool} = {})
       const row = (await client.query("INSERT INTO sessions(token_hash,csrf,expires) VALUES($1,'1',$2) ON CONFLICT(token_hash) DO UPDATE SET csrf=CASE WHEN sessions.expires<=$3 THEN '1' ELSE LEAST(11,sessions.csrf::integer+1)::text END, expires=CASE WHEN sessions.expires<=$3 THEN $2 ELSE sessions.expires END RETURNING csrf",[key,t+900,t])).rows[0];
       check(Number(row.csrf) <= 10,'Terlalu banyak percobaan. Coba lagi dalam 15 menit.',429);
     }
-    await client.query('BEGIN'); inTransaction = true;
-    if (request.method !== 'GET') await client.query('SELECT pg_advisory_xact_lock(73629101)');
+    if (request.method !== 'GET') {
+      await client.query('BEGIN'); inTransaction = true;
+      await client.query('SELECT pg_advisory_xact_lock(73629101)');
+    }
     c = contextFor(request,client); c.uploaded = [];
     const result = await mainRoute(c);
-    await client.query('COMMIT'); inTransaction = false;
+    if (inTransaction) { await client.query('COMMIT'); inTransaction = false; }
     for (const work of c.afterCommit) try { await work(); } catch { console.error('Storage cleanup failed'); }
     return result;
   } catch (error) {

@@ -12,7 +12,7 @@ export function databasePool() {
     const uri = new URL(process.env.DATABASE_URL);
     for (const key of ['sslmode', 'sslrootcert', 'sslcert', 'sslkey']) uri.searchParams.delete(key);
     pool = new pg.Pool({
-      connectionString: uri.toString(), max: 2, idleTimeoutMillis: 10000,
+      connectionString: uri.toString(), max: 2, idleTimeoutMillis: 60000, allowExitOnIdle:true,
       connectionTimeoutMillis: 10000, statement_timeout: 15000,
       ssl: databaseTls(uri.hostname, process.env.DATABASE_CA_CERT || ''),
     });

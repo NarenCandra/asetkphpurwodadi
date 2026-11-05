@@ -1,4 +1,5 @@
 .env
+.env.netlify
 data/
 __pycache__/
 *.pyc
@@ -6,4 +7,6 @@ test-results/
 .playwright-mcp/
 backups/
 dist/
+node_modules/
+.netlify/
 

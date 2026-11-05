@@ -1,5 +1,10 @@
 # Website penyewaan rumah
 
+**Deployment Netlify aktif:** lihat [NETLIFY.md](NETLIFY.md). Konfigurasi Netlify
+sekarang membangun frontend produksi dan API Netlify Functions yang memakai
+database/Storage Supabase serta akun login yang sudah ada. Bagian demo statis
+di bawah merupakan panduan mode demo terpisah, bukan konfigurasi Netlify aktif.
+
 Implementasi lokal PRD versi 0.2. `PRD.md` merupakan salinan teks dokumen `PRD_Web_Penyewaan_Rumah_v0_2.docx`, yang tetap menjadi sumber utama. Belum dilakukan deployment.
 
 ## Menjalankan di Windows

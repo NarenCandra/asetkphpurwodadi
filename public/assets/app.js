@@ -379,7 +379,7 @@ function editor(house=null) {
   if(location.hash==='#lease')$('#lease').scrollIntoView({block:'start'});
 }
 function photoManager(h) {
-  return `<div class="photo-list">${h.photos.map((p,i)=>`<div class="photo-edit"><img src="${esc(p.url)}" alt="Foto ${i+1} ${esc(h.name)}">${i===0?'<span>Foto utama</span>':''}<div class="photo-controls">${i?`<button type="button" data-main="${i}">Jadikan utama</button><button type="button" data-move="${i}" data-direction="-1" aria-label="Geser foto ${i+1} ke kiri">Kiri</button>`:''}${i<h.photos.length-1?`<button type="button" data-move="${i}" data-direction="1" aria-label="Geser foto ${i+1} ke kanan">Kanan</button>`:''}<button type="button" data-delete-photo="${p.id}">Hapus</button></div></div>`).join('')}</div><p class="photo-help">JPEG, PNG, atau WebP. Maksimal 8 MB per foto, 20 foto per aset. Foto pertama menjadi foto utama. Perubahan foto langsung disimpan.</p><div class="field"><label for="photo-upload">Unggah foto</label><input type="file" id="photo-upload" accept="image/jpeg,image/png,image/webp" multiple></div><p id="upload-status" class="small" role="status"></p>`;
+  return `<div class="photo-list">${h.photos.map((p,i)=>`<div class="photo-edit"><img src="${esc(p.url)}" alt="Foto ${i+1} ${esc(h.name)}">${i===0?'<span>Foto utama</span>':''}<div class="photo-controls">${i?`<button type="button" data-main="${i}">Jadikan utama</button><button type="button" data-move="${i}" data-direction="-1" aria-label="Geser foto ${i+1} ke kiri">Kiri</button>`:''}${i<h.photos.length-1?`<button type="button" data-move="${i}" data-direction="1" aria-label="Geser foto ${i+1} ke kanan">Kanan</button>`:''}<button type="button" data-delete-photo="${p.id}">Hapus</button></div></div>`).join('')}</div><p class="photo-help">JPEG, PNG, atau WebP. Maksimal ${window.SEWARUMA_NETLIFY?3:8} MB per foto, 20 foto per aset. Foto pertama menjadi foto utama. Perubahan foto langsung disimpan.</p><div class="field"><label for="photo-upload">Unggah foto</label><input type="file" id="photo-upload" accept="image/jpeg,image/png,image/webp" multiple></div><p id="upload-status" class="small" role="status"></p>`;
 }
 function bindPhotos(h) {
   const refresh=async()=>{const fresh=await api('/api/admin/houses/'+h.id);h.photos=fresh.photos;h.revision=fresh.revision;$('#photo-manager').innerHTML=photoManager(h);bindPhotos(h);};
@@ -394,7 +394,7 @@ function bindPhotos(h) {
     const files=[...e.target.files];e.target.disabled=true;const status=$('#upload-status');
     try {
       for(let i=0;i<files.length;i++){
-        const file=files[i];if(file.size>8*1024*1024)throw new Error('Foto maksimal 8 MB.');
+        const file=files[i], limitMb=window.SEWARUMA_NETLIFY?3:8;if(file.size>limitMb*1024*1024)throw new Error(`Foto maksimal ${limitMb} MB.`);
         status.textContent=`Mengunggah foto ${i+1} dari ${files.length}…`;
         const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.onerror=()=>reject(new Error('Foto gagal dibaca.'));reader.readAsDataURL(file);});
         await api(`/api/admin/houses/${h.id}/photos`,{method:'POST',body:JSON.stringify({data})});

@@ -9,7 +9,7 @@
     "build": "python scripts/check.py",
     "build:demo": "node scripts/build-demo.cjs",
     "build:netlify": "node scripts/build-netlify.cjs",
-    "test:netlify": "node --test tests/netlify-api.test.mjs",
+    "test:netlify": "node --test tests/netlify-api.test.mjs tests/database-tls.test.mjs",
     "dev:netlify": "node scripts/serve-netlify.mjs",
     "lint": "python scripts/check.py",
     "test": "python -m unittest discover -s tests -v"

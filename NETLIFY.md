@@ -30,8 +30,10 @@ Supabase Auth, dan tidak perlu menjalankan `supabase_schema.sql`.
    sebagai pengganti `SUPABASE_SERVICE_ROLE_KEY`. Jangan gunakan anon/publishable
    key sebagai pengganti kredensial server. Tidak ada secret yang dibutuhkan
    frontend atau build. Jangan menambahkan secret ke file Git, chat, atau `dist/`.
-3. Jika koneksi pooler memerlukan CA khusus, tambahkan `DATABASE_CA_CERT`
-   dari sertifikat SSL database Supabase. Verifikasi TLS tetap aktif; jangan
+3. CA publik **Supabase Root 2021 CA** sudah disertakan dalam paket API untuk
+   hostname database/pooler Supabase, bersama root CA standar Node.js. Variabel
+   `DATABASE_CA_CERT` hanya diperlukan untuk CA tambahan/kustom; jika diisi,
+   nilainya harus seluruh isi PEM, bukan nama/path file. Verifikasi TLS tetap aktif; jangan
    mengatasinya dengan `NODE_TLS_REJECT_UNAUTHORIZED=0`.
 4. Pastikan bucket **asset-photos** dan **tenant-docs** ada dan **private**.
    API hanya memberikan foto publik jika aset Tersedia/Dipesan. Dokumen hanya

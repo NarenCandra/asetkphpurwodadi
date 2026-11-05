@@ -239,3 +239,33 @@ integration('Excel import previews, commits, and deduplicates existing rows',asy
   const duplicate=await admin.call('/api/admin/import','POST',{...body,commit:true});
   assert.equal(duplicate.data.new,0); assert.equal(duplicate.data.skipped,1);
 });
+integration('admin navbar lists use a fixed query count and preserve tenant/document data',async()=>{
+  const admin=browser('admin-list-performance');
+  const login=await admin.call('/api/login','POST',{username:'test-admin',password:'test-admin-password'});
+  assert.equal(login.status,200);
+  for (const [path,budget] of [['/api/admin/applications',3],['/api/admin/tenants',2]]) {
+    let queries=0;
+    const trackedPool={connect:async()=>{
+      const client=await pool.connect();
+      return {query:(...args)=>{queries++;return client.query(...args);},release:()=>client.release()};
+    }};
+    const response=await handleRequest(new Request('https://site.example'+path,{headers:{cookie:'session='+admin.cookies.session}}),{pool:trackedPool});
+    assert.equal(response.status,200);
+    assert.ok(queries<=budget,`${path}: ${queries} queries exceeds ${budget}`);
+    const rows=await response.json();
+    assert.ok(rows.length>0);
+    if(path.endsWith('applications')) {
+      const application=rows.find(a=>a.tenant.email==='flow@example.test' && a.kind==='sewa_baru');
+      assert.equal(application.ktp_status,'terverifikasi');
+      assert.equal(application.house.name,'Flow house');
+      assert.equal(application.status,'selesai');
+      assert.equal(typeof application.pending_documents,'number');
+    } else {
+      const tenant=rows.find(u=>u.email==='flow@example.test');
+      assert.equal(tenant.ktp.status,'terverifikasi');
+      assert.equal(tenant.applications,3);
+      assert.equal(tenant.open,1);
+      assert.equal(tenant.password_hash,undefined);
+    }
+  }
+});

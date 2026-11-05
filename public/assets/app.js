@@ -25,6 +25,39 @@ let demoDataPromise;
 let publicHousesCache = null;
 let publicHousesRequest = null;
 let publicHousesVersion = 0;
+let adminSessionAt = 0;
+let adminDataVersion = 0;
+const adminDataCache = new Map();
+const adminDataRequests = new Map();
+function invalidateAdminData() {
+  adminDataVersion++;
+  adminDataCache.clear();
+  adminDataRequests.clear();
+}
+async function loadAdminSession() {
+  if (state.session.authenticated && Date.now() - adminSessionAt < 15000) return state.session;
+  state.session = await api('/api/session');
+  adminSessionAt = Date.now();
+  if (!state.session.authenticated) invalidateAdminData();
+  return state.session;
+}
+async function loadAdminData(path) {
+  const cached = adminDataCache.get(path);
+  if (cached && Date.now() - cached.at < 10000) return structuredClone(cached.data);
+  let pending = adminDataRequests.get(path);
+  if (!pending) {
+    const version = adminDataVersion;
+    pending = api(path).then(data => {
+      if (version === adminDataVersion) {
+        if (adminDataCache.size >= 40) adminDataCache.delete(adminDataCache.keys().next().value);
+        adminDataCache.set(path,{at:Date.now(),data});
+      }
+      return data;
+    }).finally(() => { if (adminDataRequests.get(path) === pending) adminDataRequests.delete(path); });
+    adminDataRequests.set(path,pending);
+  }
+  return structuredClone(await pending);
+}
 function invalidatePublicHouses() {
   publicHousesVersion++;
   publicHousesCache = null;
@@ -69,10 +102,14 @@ async function api(path, options={}) {
   const data = await response.json();
   if (!response.ok) {
     if (response.status === 401 && /^\/api\/(my|me|user)/.test(path)) state.user = {authenticated:false};
-    else if (response.status === 401 && path !== '/api/login') state.session = {authenticated:false};
+    else if (response.status === 401 && path !== '/api/login') { state.session = {authenticated:false}; adminSessionAt = 0; invalidateAdminData(); }
     throw new Error(data.error || 'Permintaan gagal. Coba kembali.');
   }
-  if (options.method && options.method !== 'GET') invalidatePublicHouses();
+  if (options.method && options.method !== 'GET') {
+    invalidatePublicHouses();
+    invalidateAdminData();
+    if (path === '/api/login' || path === '/api/logout') adminSessionAt = 0;
+  }
   return data;
 }
 function toast(message) {
@@ -457,11 +494,11 @@ async function route() {
         shell(`<div class="container section">${empty('Panel admin belum tersedia pada demo','Website ini menampilkan data contoh. Pengelolaan aset memerlukan backend dan penyimpanan data aktif.','<a class="btn" href="/rumah">Lihat katalog demo</a><a class="btn secondary" href="/admin/pengajuan">Pratinjau pengajuan & dokumen</a>')}</div>`,'Demo Admin');
         return;
       }
-      state.session=await api('/api/session');
+      state.session=await loadAdminSession();
       if(id!==navigationId)return;
       if(!state.session.authenticated)return login();
-      if(path==='/admin') {state.adminHouses=await api('/api/admin/houses');if(id===navigationId)dashboard();return;}
-      if(path==='/admin/rumah'){state.adminHouses=await api('/api/admin/houses');if(id===navigationId)manage();return;}
+      if(path==='/admin') {state.adminHouses=await loadAdminData('/api/admin/houses');if(id===navigationId)dashboard();return;}
+      if(path==='/admin/rumah'){state.adminHouses=await loadAdminData('/api/admin/houses');if(id===navigationId)manage();return;}
       if(path==='/admin/rumah/baru')return editor();
       if(/^\/admin\/rumah\/[a-f0-9]+$/.test(path)){const house=await api('/api/admin/houses/'+path.split('/').pop());if(id===navigationId)editor(house);return;}
     }else if(path==='/'||path==='/rumah'){

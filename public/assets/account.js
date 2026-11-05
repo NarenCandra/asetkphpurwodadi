@@ -63,7 +63,7 @@ const Account = {
     }
     if (/^\/admin\/(pengajuan|impor|penyewa)/.test(path)) {
       if (window.SEWARUMA_STATIC_DEMO) return false;
-      state.session = await api('/api/session');
+      state.session = await loadAdminSession();
       if (id !== navigationId) return true;
       if (!state.session.authenticated) { login(); return true; }
       if (path === '/admin/impor') { Account.importPage(); return true; }
@@ -229,15 +229,20 @@ const Account = {
 
   // ------------------------------------------------------------------- admin
   adminList() {
+    const pageId = navigationId;
+    let loadId = 0;
     const params = new URLSearchParams(location.search);
     const kinds = Object.entries(APP_KIND).map(([k, v]) => `<option value="${k}"${params.get('kind') === k ? ' selected' : ''}>${v}</option>`).join('');
     const statuses = Object.entries(APP_STATUS).map(([k, v]) => `<option value="${k}"${params.get('status') === k ? ' selected' : ''}>${v}</option>`).join('');
     adminShell(`<div class="admin-filter filter-3"><div class="field"><label for="f-q">Cari referensi, nama, atau email</label><input id="f-q" type="search" value="${esc(params.get('q') || '')}"></div><div class="field"><label for="f-kind">Jenis</label><select id="f-kind"><option value="">Semua jenis</option>${kinds}</select></div><div class="field"><label for="f-status">Status</label><select id="f-status"><option value="">Semua status</option>${statuses}</select></div></div><p class="small muted" id="app-count" aria-live="polite"></p><div id="app-table"></div>`, 'Pengajuan dan Dokumen');
     const load = async () => {
+      if (pageId !== navigationId) return;
+      const requestId = ++loadId;
       const query = new URLSearchParams();
       for (const [key, id] of [['q', 'f-q'], ['kind', 'f-kind'], ['status', 'f-status']]) if ($('#' + id).value) query.set(key, $('#' + id).value);
       try {
-        const rows = await api('/api/admin/applications?' + query);
+        const rows = await loadAdminData('/api/admin/applications?' + query);
+        if (pageId !== navigationId || requestId !== loadId) return;
         $('#app-count').textContent = `${rows.length} pengajuan`;
         $('#app-table').innerHTML = rows.length ? `<div class="table-wrap asset-register"><table role="table"><caption class="sr-only">Daftar pengajuan penyewa</caption><thead><tr><th scope="col">Referensi</th><th scope="col">Penyewa</th><th scope="col">Aset</th><th scope="col">Jenis</th><th scope="col">Status</th><th scope="col">Pembayaran</th><th scope="col">KTP</th><th scope="col">Berkas menunggu</th><th scope="col">Tindakan</th></tr></thead><tbody>${rows.map(a => `<tr><td data-label="Referensi">${esc(a.ref)}</td><td data-label="Penyewa">${esc(a.tenant.name)}<small>${esc(a.tenant.email)}</small></td><td data-label="Aset">${esc(a.house?.name)} (${esc(a.house?.code)})</td><td data-label="Jenis">${esc(APP_KIND[a.kind])}</td><td data-label="Status">${chip(APP_STATUS[a.status], a.status)}</td><td data-label="Pembayaran">${a.kind === 'survei' ? '-' : chip(PAYMENT[a.payment], a.payment)}</td><td data-label="KTP">${a.ktp_status ? chip(DOC_STATUS[a.ktp_status], a.ktp_status) : '-'}</td><td data-label="Berkas menunggu">${a.pending_documents || 0}</td><td data-label="Tindakan"><a class="nowrap" href="/admin/pengajuan/${a.id}">Kelola</a></td></tr>`).join('')}</tbody></table></div>` : empty('Belum ada pengajuan', 'Pengajuan penyewa akan tampil di sini.');
         history.replaceState({}, '', '/admin/pengajuan' + (query.size ? '?' + query : ''));
@@ -304,6 +309,8 @@ const Account = {
   },
 
   tenantList() {
+    const pageId = navigationId;
+    let loadId = 0;
     adminShell(`<div class="admin-filter"><div class="field"><label for="t-q">Cari nama, email, atau WhatsApp</label><input id="t-q" type="search"></div><div class="field"><label for="t-ktp">Status KTP</label><select id="t-ktp"><option value="">Semua status KTP</option><option value="none">Belum diunggah</option><option value="menunggu">Menunggu verifikasi</option><option value="terverifikasi">Terverifikasi</option><option value="perlu_perbaikan">Perlu perbaikan</option></select></div></div><p class="small muted" id="t-count" aria-live="polite"></p><div id="t-table"></div>`, 'Penyewa dan KTP');
     let all = [];
     const draw = () => {
@@ -312,7 +319,15 @@ const Account = {
       $('#t-count').textContent = `${rows.length} penyewa`;
       $('#t-table').innerHTML = rows.length ? `<div class="table-wrap asset-register"><table role="table"><caption class="sr-only">Daftar penyewa</caption><thead><tr><th scope="col">Penyewa</th><th scope="col">WhatsApp</th><th scope="col">KTP</th><th scope="col">Pengajuan</th><th scope="col">Tindakan</th></tr></thead><tbody>${rows.map(t => `<tr><td data-label="Penyewa">${esc(t.name)}<small>${esc(t.email)}</small></td><td data-label="WhatsApp">+${esc(t.whatsapp)}</td><td data-label="KTP">${t.ktp ? chip(DOC_STATUS[t.ktp.status], t.ktp.status) : chip('Belum diunggah', 'belum')}</td><td data-label="Pengajuan">${t.applications} (${t.open} aktif)</td><td data-label="Tindakan"><a class="nowrap" href="/admin/penyewa/${t.id}">${t.ktp?.status === 'menunggu' ? 'Periksa KTP' : 'Lihat'}</a></td></tr>`).join('')}</tbody></table></div>` : empty('Belum ada penyewa', 'Akun penyewa yang mendaftar akan tampil di sini.');
     };
-    const load = async () => { try { all = await api('/api/admin/tenants?q=' + encodeURIComponent($('#t-q').value)); draw(); } catch (error) { toast(error.message); } };
+    const load = async () => {
+      if (pageId !== navigationId) return;
+      const requestId = ++loadId;
+      try {
+        const rows = await loadAdminData('/api/admin/tenants?q=' + encodeURIComponent($('#t-q').value));
+        if (pageId !== navigationId || requestId !== loadId) return;
+        all = rows; draw();
+      } catch (error) { if (pageId === navigationId) toast(error.message); }
+    };
     $('#t-q').oninput = () => { clearTimeout(Account.timer); Account.timer = setTimeout(load, 250); };
     $('#t-ktp').onchange = draw;
     load();

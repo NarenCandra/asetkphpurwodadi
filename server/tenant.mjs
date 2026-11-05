@@ -25,25 +25,26 @@ async function addDocument(c,uid,aid,kind,body) {
   await c.q('INSERT INTO documents(id,user_id,application_id,kind,filename,original_name,version,status,created) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',[id,uid,aid,kind,filename,name,row.version,kind==='surat_siap_ttd' ? 'tersedia' : 'menunggu',now()]);
   return id;
 }
-async function progress(c,a) {
+async function progress(c,a,documents=null) {
   if (['ditolak','dibatalkan'].includes(a.status)) return [0,a.status === 'dibatalkan' ? 'Pengajuan ditutup.' : 'Pengajuan ditolak. Lihat catatan pengelola.'];
   if (a.kind === 'survei') return [{diproses:2,terjadwal:3,selesai:3}[a.status] || 2, {diproses:'Lanjutkan ke WhatsApp dengan nomor referensi untuk menyepakati jadwal survei.',terjadwal:'Survei sudah dijadwalkan pengelola. Jika setelah survei Anda sepakat, lanjutkan ke permohonan sewa.',selesai:'Survei selesai. Jika sepakat, lanjutkan ke permohonan sewa.'}[a.status] || ''];
   if (a.applied) return [4,'Sewa aktif. Lihat periode di Sewa Saya.'];
   if (['disetujui','selesai'].includes(a.status)) return [3,a.payment === 'lunas' ? 'Pengajuan selesai dan pelunasan dikonfirmasi. Menunggu pengelola mencatat periode sewa.' : a.payment === 'dp' ? 'DP dikonfirmasi. Lanjutkan pelunasan melalui WhatsApp.' : 'Disetujui. Lanjutkan ke WhatsApp untuk pembayaran.'];
-  const ktp = a.ktp_doc_id ? await c.one('SELECT * FROM documents WHERE id=$1',[a.ktp_doc_id]) : null;
+  const ktp = a.ktp_doc_id ? (documents ? documents.find(d=>d.id===a.ktp_doc_id) : await c.one('SELECT * FROM documents WHERE id=$1',[a.ktp_doc_id])) : null;
   if (ktp?.status === 'perlu_perbaikan') return [1,'Perbaiki KTP: '+(ktp.reason || 'lihat catatan pengelola')+'.'];
   if (a.status === 'perlu_perbaikan') return [1,'Perbaiki berkas: '+(a.admin_note || 'lihat catatan pengelola')+'.'];
-  if (!await latest(c,a.user_id,'surat_siap_ttd',a.id)) return [1,'Menunggu pengelola menyiapkan surat siap tanda tangan.'];
-  const signed = await latest(c,a.user_id,'surat_ttd',a.id);
+  const template = documents ? documents.filter(d=>d.application_id===a.id && d.kind==='surat_siap_ttd').sort((x,y)=>y.version-x.version)[0] : await latest(c,a.user_id,'surat_siap_ttd',a.id);
+  if (!template) return [1,'Menunggu pengelola menyiapkan surat siap tanda tangan.'];
+  const signed = documents ? documents.filter(d=>d.application_id===a.id && d.kind==='surat_ttd').sort((x,y)=>y.version-x.version)[0] : await latest(c,a.user_id,'surat_ttd',a.id);
   if (!signed) return [1,'Unduh surat, tandatangani di luar website, lalu unggah hasilnya.'];
   if (signed.status === 'perlu_perbaikan') return [1,'Perbaiki surat: '+(signed.reason || 'lihat catatan pengelola')+'.'];
   return [2,'Berkas lengkap. Menunggu verifikasi pengelola.'];
 }
-async function appJson(c,a,admin=false,detail=false) {
+async function appJson(c,a,admin=false,detail=false,related=null) {
   const data = Object.fromEntries(['id','ref','kind','status','payment','closed','applied','created','updated','lease_id','admin_note','payment_note'].map(k=>[k,a[k]]));
-  data.house = await houseBrief(c,a.house_id);
-  [data.step,data.next] = await progress(c,a);
-  if (admin) data.tenant = await c.one('SELECT name,email,whatsapp FROM users WHERE id=$1',[a.user_id]);
+  data.house = related ? related.house : await houseBrief(c,a.house_id);
+  [data.step,data.next] = await progress(c,a,related?.documents);
+  if (admin) data.tenant = related ? related.tenant : await c.one('SELECT name,email,whatsapp FROM users WHERE id=$1',[a.user_id]);
   if (detail) {
     data.documents = (await c.q('SELECT * FROM documents WHERE application_id=$1 ORDER BY kind,version',[a.id])).map(d=>docJson(d,admin));
     data.ktp = docJson(a.ktp_doc_id ? await c.one('SELECT * FROM documents WHERE id=$1',[a.ktp_doc_id]) : null,admin);
@@ -212,7 +213,12 @@ async function adminRoute(c) {
   if (path === '/api/admin/tenants' && method === 'GET') {
     const text = '%'+(c.url.searchParams.get('q') || '').trim()+'%';
     const result = [];
-    for (const u of await c.q('SELECT id,name,email,whatsapp,created FROM users WHERE name ILIKE $1 OR email ILIKE $1 OR whatsapp LIKE $1 ORDER BY created DESC LIMIT 500',[text])) result.push(await tenantJson(c,u));
+    const rows = await c.q(`SELECT u.id,u.name,u.email,u.whatsapp,u.created,
+      (SELECT row_to_json(d) FROM documents d WHERE d.user_id=u.id AND d.kind='ktp' AND d.application_id IS NULL ORDER BY d.version DESC LIMIT 1) AS ktp,
+      (SELECT COUNT(*)::int FROM applications a WHERE a.user_id=u.id) AS applications,
+      (SELECT COUNT(*)::int FROM applications a WHERE a.user_id=u.id AND a.closed=0) AS open
+      FROM users u WHERE u.name ILIKE $1 OR u.email ILIKE $1 OR u.whatsapp LIKE $1 ORDER BY u.created DESC LIMIT 500`,[text]);
+    for (const row of rows) result.push({...row,ktp:docJson(row.ktp,true)});
     return json(result);
   }
   let m = path.match(/^\/api\/admin\/tenants\/([a-f0-9]+)$/);
@@ -227,10 +233,17 @@ async function adminRoute(c) {
     for (const key of ['kind','status','payment']) if (c.url.searchParams.get(key)) { args.push(c.url.searchParams.get(key)); conditions.push(`a.${key}=$${args.length}`); }
     if (c.url.searchParams.get('q')?.trim()) { args.push('%'+c.url.searchParams.get('q').trim()+'%'); conditions.push(`(a.ref ILIKE $${args.length} OR u.name ILIKE $${args.length} OR u.email ILIKE $${args.length})`); }
     const result = [];
-    for (const a of await c.q('SELECT a.* FROM applications a JOIN users u ON u.id=a.user_id'+(conditions.length?' WHERE '+conditions.join(' AND '):'')+' ORDER BY a.created DESC LIMIT 500',args)) {
-      const item = await appJson(c,a,true), ktp = await latest(c,a.user_id,'ktp');
+    const rows = await c.q('SELECT a.*,h.body AS house_body,u.name AS tenant_name,u.email AS tenant_email,u.whatsapp AS tenant_whatsapp FROM applications a JOIN users u ON u.id=a.user_id LEFT JOIN houses h ON h.id=a.house_id'+(conditions.length?' WHERE '+conditions.join(' AND '):'')+' ORDER BY a.created DESC LIMIT 500',args);
+    const documents = rows.length ? await c.q("SELECT * FROM documents WHERE application_id=ANY($1::text[]) OR (user_id=ANY($2::text[]) AND kind='ktp' AND application_id IS NULL) OR id=ANY($3::text[])",[rows.map(a=>a.id),[...new Set(rows.map(a=>a.user_id))],rows.map(a=>a.ktp_doc_id).filter(Boolean)]) : [];
+    for (const a of rows) {
+      const body = a.house_body ? JSON.parse(a.house_body) : null;
+      const house = body ? Object.fromEntries(['code','name','status','area','monthly','yearly'].map(k=>[k,body[k]])) : null;
+      if (house) house.id = a.house_id;
+      const related = {house,tenant:{name:a.tenant_name,email:a.tenant_email,whatsapp:a.tenant_whatsapp},documents};
+      const item = await appJson(c,a,true,false,related);
+      const ktp = documents.filter(d=>d.user_id===a.user_id && d.kind==='ktp' && d.application_id===null).sort((x,y)=>y.version-x.version)[0];
       item.ktp_status = ktp?.status ?? null;
-      item.pending_documents = (await c.one("SELECT COUNT(*)::int AS count FROM documents WHERE status='menunggu' AND (application_id=$1 OR id=$2)",[a.id,ktp?.id ?? null])).count;
+      item.pending_documents = documents.filter(d=>d.status==='menunggu' && (d.application_id===a.id || d.id===ktp?.id)).length;
       result.push(item);
     }
     return json(result);

@@ -237,6 +237,19 @@ class TenantTests(unittest.TestCase):
         periods = t.call('/api/my/leases')[1][0]['periods']
         self.assertEqual([(p['start'], p['end']) for p in periods], [('2026-11-10', '2027-11-09'), ('2027-11-10', '2028-11-09')])  # riwayat tidak ditimpa
 
+    def test_admin_list_flags_application_waiting_for_letter(self):
+        a, t = self.admin(), self.tenant()
+        hid = self.house(a, 'LETTER-1')
+        survey = t.call('/api/my/applications', 'POST', {'kind': 'survei', 'house_id': hid})[1]['id']
+        self.assertEqual(self.upload(t, '/api/my/ktp')[0], 201)
+        fid = t.call('/api/my/applications', 'POST', {'kind': 'sewa_baru', 'house_id': hid})[1]['id']
+        listing = lambda: {r['id']: r for r in a.call('/api/admin/applications')[1]}
+        self.assertTrue(listing()[fid]['needs_letter'])
+        self.assertFalse(listing()[survey]['needs_letter'])
+        self.assertIn('menyiapkan surat', t.call(f'/api/my/applications/{fid}')[1]['next'])
+        self.assertEqual(self.upload(a, f'/api/admin/applications/{fid}/documents')[0], 201)
+        self.assertFalse(listing()[fid]['needs_letter'])
+
     def test_tenant_isolation(self):
         a, t1, t2 = self.admin(), self.tenant(), self.tenant()
         hid = self.house(a, 'ISO-1')

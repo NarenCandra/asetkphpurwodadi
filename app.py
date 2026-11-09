@@ -1,6 +1,7 @@
 """Local rental catalog. Python 3.12+, no third-party runtime dependencies."""
 import argparse
 import base64
+import collections
 import getpass
 import hashlib
 import hmac
@@ -45,6 +46,26 @@ OWN_TABLES = ('admin', 'sessions', 'houses', 'photos', 'users', 'user_sessions',
 
 def connect():
     return database.connect(DB)
+
+
+# Foto disimpan di Supabase Storage; menyimpan salinan di memori menghindari unduhan ulang di setiap tampilan.
+# Nama berkas unik per unggahan, jadi salinan tidak pernah basi.
+MEDIA_CACHE, MEDIA_LOCK, MEDIA_LIMIT = collections.OrderedDict(), threading.Lock(), 64 * 1024 * 1024
+
+
+def media_bytes(filename):
+    with MEDIA_LOCK:
+        raw = MEDIA_CACHE.get(filename)
+        if raw is not None:
+            MEDIA_CACHE.move_to_end(filename)
+            return raw
+    raw = storage.get(DATA, 'uploads', filename)
+    if len(raw) <= MEDIA_LIMIT // 8:
+        with MEDIA_LOCK:
+            MEDIA_CACHE[filename] = raw
+            while sum(len(v) for v in MEDIA_CACHE.values()) > MEDIA_LIMIT:
+                MEDIA_CACHE.popitem(last=False)
+    return raw
 
 
 def secure_postgres(db):
@@ -172,7 +193,7 @@ def validate_house(body, previous=None, photo_count=0):
     result['asset_type'] = body.get('asset_type', (previous or {}).get('asset_type', 'building'))
     if result['asset_type'] not in ('building', 'land'):
         raise ValueError('Jenis aset tidak valid.')
-    for key in ('name', 'code', 'description', 'area', 'address', 'maps_url', 'terms', 'extra_costs', 'internal_notes', 'lease_period', 'lease_start', 'lease_end', 'access', 'land_condition', 'inventory_number', 'asset_condition', 'legal_basis', 'cooperation_type', 'keterangan'):
+    for key in ('name', 'code', 'description', 'area', 'address', 'maps_url', 'terms', 'extra_costs', 'internal_notes', 'lease_period', 'lease_start', 'lease_end', 'access', 'land_condition', 'inventory_number', 'asset_condition', 'legal_basis', 'cooperation_type', 'keterangan', 'recommended_use', 'category'):
         value = body.get(key, '')
         if not isinstance(value, str) or len(value) > 10000:
             raise ValueError('Isian teks tidak valid: ' + key)
@@ -187,6 +208,8 @@ def validate_house(body, previous=None, photo_count=0):
             result[key] = int(value)
     if previous and previous.get('import_key'):
         result['import_key'] = previous['import_key']
+    if result['category'] not in ('', 'Rumah', 'Lahan', 'Gudang/TPK', 'Kantor/Gedung', 'Lainnya'):
+        raise ValueError('Kategori aset tidak valid.')
     if result['cooperation_type'] not in ('', 'Sewa 1 tahun', 'Sharing', 'Franchise'):
         raise ValueError('Bentuk kerja tidak valid.')
     if not result['name'] or not result['code']:
@@ -257,7 +280,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header('Content-Type', content_type)
         self.send_header('Content-Length', str(len(body)))
-        self.send_header('Cache-Control', 'no-store')
+        if 'Cache-Control' not in (extra or {}):
+            self.send_header('Cache-Control', 'no-store')
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('X-Frame-Options', 'DENY')
         self.send_header('Referrer-Policy', 'strict-origin-when-cross-origin')
@@ -342,18 +366,24 @@ class Handler(BaseHTTPRequestHandler):
                 if not photo or (json.loads(photo['body'])['status'] not in ('Tersedia', 'Dipesan') and not self.session()):
                     return self.send(404, {'error': 'Foto tidak tersedia.'})
                 try:
-                    raw = storage.get(DATA, 'uploads', photo['filename'])
+                    raw = media_bytes(photo['filename'])
                 except FileNotFoundError:
                     return self.send(404, {'error': 'Foto tidak tersedia.'})
                 except storage.StorageError as error:
                     print('Storage:', error, flush=True)
                     return self.send(502, {'error': 'Penyimpanan foto sedang bermasalah.'})
-                return self.send(200, raw, mimetypes.guess_type(photo['filename'])[0] or 'application/octet-stream')
+                return self.send(200, raw, mimetypes.guess_type(photo['filename'])[0] or 'application/octet-stream', {'Cache-Control': 'private, max-age=604800'})
             if path.startswith('/assets/'):
                 file = (ROOT / 'public' / path.lstrip('/')).resolve()
                 if not file.is_relative_to(ROOT / 'public' / 'assets') or not file.is_file():
                     return self.send(404, {'error': 'Tidak ditemukan.'})
-                return self.send(200, file.read_bytes(), mimetypes.guess_type(file.name)[0] or 'application/octet-stream')
+                content = file.read_bytes()
+                etag = '"%x-%x"' % (file.stat().st_mtime_ns, len(content))
+                headers = {'ETag': etag, 'Cache-Control': 'no-cache'}  # selalu dicek, tetapi 304 bila tak berubah
+                kind = mimetypes.guess_type(file.name)[0] or 'application/octet-stream'
+                if self.headers.get('If-None-Match') == etag:
+                    return self.send(304, b'', kind, headers)
+                return self.send(200, content, kind, headers)
             if path.startswith('/api/'):
                 return self.send(404, {'error': 'Tidak ditemukan.'})
             return self.send(200, (ROOT / 'public' / 'index.html').read_bytes(), 'text/html; charset=utf-8')

@@ -41,13 +41,14 @@ export function leaseNotice(house) {
 export function validateHouse(body, previous = null) {
   const result = {asset_type: body.asset_type ?? previous?.asset_type ?? 'building'};
   check(['building','land'].includes(result.asset_type), 'Jenis aset tidak valid.');
-  for (const key of ['name','code','description','area','address','maps_url','terms','extra_costs','internal_notes','lease_period','lease_start','lease_end','access','land_condition','inventory_number','asset_condition','legal_basis','cooperation_type','keterangan']) {
+  for (const key of ['name','code','description','area','address','maps_url','terms','extra_costs','internal_notes','lease_period','lease_start','lease_end','access','land_condition','inventory_number','asset_condition','legal_basis','cooperation_type','keterangan','recommended_use','category']) {
     const value = body[key] ?? '';
     check(typeof value === 'string' && value.length <= 10000, 'Isian teks tidak valid: ' + key);
     result[key] = value.trim();
   }
   check(result.name && result.code, 'Nama dan kode rumah wajib diisi.');
   check(['','Sewa 1 tahun','Sharing','Franchise'].includes(result.cooperation_type), 'Bentuk kerja tidak valid.');
+  check(['','Rumah','Lahan','Gudang/TPK','Kantor/Gedung','Lainnya'].includes(result.category), 'Kategori aset tidak valid.');
   if (result.maps_url) {
     let url;
     try { url = new URL(result.maps_url); } catch { /* rejected below */ }

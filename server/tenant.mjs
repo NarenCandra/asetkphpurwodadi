@@ -1,6 +1,7 @@
 import {check, hex, token, sha, equal, passwordHash, now, cleanWhatsapp, readUpload, contentType, iso, today, HttpError} from './domain.mjs';
 import {json, storage} from './api.mjs';
 import {importExcel} from './xlsx.mjs';
+import {convertUpload, applyRecords} from './importer.mjs';
 
 const userJson = u => ({id:u.uid ?? u.id,name:u.name,email:u.email,whatsapp:u.whatsapp});
 const docJson = (d, admin) => d ? ({id:d.id,kind:d.kind,version:d.version,status:d.status,reason:d.reason,name:d.original_name,created:d.created,application_id:d.application_id,url:`/api/${admin ? 'admin' : 'my'}/documents/${d.id}/file`}) : null;
@@ -9,7 +10,7 @@ async function houseBrief(c,id) {
   const row = await c.one('SELECT id,body FROM houses WHERE id=$1',[id]);
   if (!row) return null;
   const b = JSON.parse(row.body);
-  return {id:row.id,code:b.code,name:b.name,status:b.status,area:b.area,monthly:b.monthly,yearly:b.yearly};
+  return {id:row.id,code:b.code,name:b.name,address:b.address,status:b.status,area:b.area,monthly:b.monthly,yearly:b.yearly};
 }
 async function startSession(c,u,status=200) {
   const value = token(), csrf = token();
@@ -34,7 +35,7 @@ async function progress(c,a,documents=null) {
   if (ktp?.status === 'perlu_perbaikan') return [1,'Perbaiki KTP: '+(ktp.reason || 'lihat catatan pengelola')+'.'];
   if (a.status === 'perlu_perbaikan') return [1,'Perbaiki berkas: '+(a.admin_note || 'lihat catatan pengelola')+'.'];
   const template = documents ? documents.filter(d=>d.application_id===a.id && d.kind==='surat_siap_ttd').sort((x,y)=>y.version-x.version)[0] : await latest(c,a.user_id,'surat_siap_ttd',a.id);
-  if (!template) return [1,'Menunggu pengelola menyiapkan surat siap tanda tangan.'];
+  if (!template) return [1,'Pengelola sedang menyiapkan surat permohonan Anda. Setelah tersedia, unduh, tandatangani di luar website, lalu unggah hasilnya di sini.'];
   const signed = documents ? documents.filter(d=>d.application_id===a.id && d.kind==='surat_ttd').sort((x,y)=>y.version-x.version)[0] : await latest(c,a.user_id,'surat_ttd',a.id);
   if (!signed) return [1,'Unduh surat, tandatangani di luar website, lalu unggah hasilnya.'];
   if (signed.status === 'perlu_perbaikan') return [1,'Perbaiki surat: '+(signed.reason || 'lihat catatan pengelola')+'.'];
@@ -99,9 +100,11 @@ async function tenantJson(c,u,detail=false) {
   return data;
 }
 async function adminUpdate(c,a,body) {
-  const status = body.status ?? a.status, payment = body.payment ?? a.payment, note = body.admin_note ?? a.admin_note, pnote = body.payment_note ?? a.payment_note;
+  let status = body.status ?? a.status; const payment = body.payment ?? a.payment, note = body.admin_note ?? a.admin_note, pnote = body.payment_note ?? a.payment_note;
   check(['diproses','terjadwal','selesai','perlu_perbaikan','disetujui','ditolak','dibatalkan'].includes(status) && ['belum','dp','lunas'].includes(payment) && typeof note === 'string' && typeof pnote === 'string' && note.length <= 2000 && pnote.length <= 2000,'Data pengajuan tidak valid.');
   check(!a.applied,'Pengajuan ini sudah diaktifkan menjadi sewa dan tidak dapat diubah.');
+  // Pelunasan dicabut (mis. salah input): status Selesai otomatis kembali ke Disetujui.
+  if (a.kind !== 'survei' && a.payment === 'lunas' && payment !== 'lunas' && status === 'selesai') status = 'disetujui';
   check(a.kind === 'survei' ? !['perlu_perbaikan','disetujui'].includes(status) && payment === 'belum' : status !== 'terjadwal','Status tidak sesuai dengan jenis pengajuan.');
   check(a.kind === 'survei' || status !== 'selesai' || payment === 'lunas','Status Selesai memerlukan pelunasan yang dikonfirmasi.');
   check(status !== 'perlu_perbaikan' || note.trim(),'Tuliskan alasan perbaikan pada catatan admin.');
@@ -227,6 +230,8 @@ async function adminRoute(c) {
     check(u,'Penyewa tidak ditemukan.',404);
     return json(await tenantJson(c,u,true));
   }
+  if (path === '/api/admin/import/convert' && method === 'POST') return json(await convertUpload(c,await c.body()));
+  if (path === '/api/admin/import/apply' && method === 'POST') return json(await applyRecords(c,await c.body()));
   if (path === '/api/admin/import' && method === 'POST') return json(await importExcel(c,await c.body()));
   if (path === '/api/admin/applications' && method === 'GET') {
     const args = [], conditions = [];
@@ -244,6 +249,7 @@ async function adminRoute(c) {
       const ktp = documents.filter(d=>d.user_id===a.user_id && d.kind==='ktp' && d.application_id===null).sort((x,y)=>y.version-x.version)[0];
       item.ktp_status = ktp?.status ?? null;
       item.pending_documents = documents.filter(d=>d.status==='menunggu' && (d.application_id===a.id || d.id===ktp?.id)).length;
+      item.needs_letter = a.kind !== 'survei' && !a.closed && !a.applied && !documents.some(d=>d.application_id===a.id && d.kind==='surat_siap_ttd');
       result.push(item);
     }
     return json(result);

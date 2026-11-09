@@ -94,3 +94,32 @@ Tes Storage memakai transport tiruan, bukan mengunggah KTP ke Supabase asli.
 
 Demo statis tetap dapat dibuat dengan `npm.cmd run build:demo` untuk kebutuhan
 pratinjau terpisah; hasilnya tidak digunakan konfigurasi produksi Netlify.
+
+## Catatan 5 Nov 2026
+
+- Unggah berkas: bila bucket `tenant-docs` / `asset-photos` belum ada di Supabase, API kini membuatnya otomatis (privat) lalu mengulang unggahan. Penyebab error sebenarnya dicatat di log Netlify Functions (`Supabase Storage gagal: ...`).
+- Status **Selesai** otomatis diset saat pelunasan dikonfirmasi. Untuk data lama yang sudah Lunas tetapi masih Disetujui, jalankan sekali di Supabase SQL Editor:
+
+```sql
+UPDATE applications SET status='selesai'
+WHERE kind <> 'survei' AND payment='lunas' AND status='disetujui';
+```
+
+## Impor otomatis (konversi ke template)
+
+Halaman Admin > Impor Excel punya bagian **Impor otomatis**. Format Excel bebas: judul kolom dikenali dengan aturan (termasuk judul dua baris dan salah ketik ringan); kolom yang tidak dikenal dipetakan oleh Claude API bila variabel **ANTHROPIC_API_KEY** diisi di Netlify (opsional: ANTHROPIC_MODEL, default claude-sonnet-4-6). Tanpa key, kolom tak dikenal dilewati. AI hanya memetakan judul kolom; isi data tidak pernah diubah oleh AI. Template: `public/assets/template-impor-aset.xlsx`. Foto belum diimpor otomatis.
+
+### Foto dan filter katalog
+
+- Foto di lembar kerja lain (gambar melayang) dibaca di browser: lembar `1. nama`, `2. nama`, dst. dicocokkan ke aset lewat angka = kolom No., kolom Foto, atau kemiripan nama; bisa diubah di pratinjau sebelum impor. Foto dikecilkan (maks. 1600 px) dan diunggah ke aset yang belum punya foto. Gambar "Place in Cell" belum didukung.
+- Filter katalog: Periode sewa, Jenis aset, Kawasan. Kawasan = kecamatan yang dibaca dari alamat ("Kec. X" / "Kecamatan X"), daftar pilihan dibentuk dari data yang ada. Jenis aset = Rumah / Lahan / Gudang/TPK / Kantor/Gedung / Lainnya, ditebak dari jenis dan nama aset; bisa diganti per aset di form admin ("Jenis aset untuk filter").
+
+### Server lokal (Python) dan Netlify (Node)
+
+Impor otomatis ada di dua backend: `importconv.py` (untuk `python app.py serve`, localhost:8000) dan `server/convert.mjs` + `server/importer.mjs` (Netlify). Logikanya sama. Jalankan ulang server Python setelah menimpa file. Baris penomoran kolom (1, 2, 3, ...) di bawah judul dilewati, dan bila Excel punya banyak lembar, lembar dengan judul kolom paling cocok yang dipakai (atau isi kolom "Lembar kerja").
+
+### Performa dan panel samping (6 Nov 2026)
+
+- Server Python: koneksi Postgres dipakai ulang lewat kolam kecil (`db.py`), karena membuka koneksi baru ke Supabase di setiap request lambat (terutama bila region database jauh dari pengguna; saat ini London). Foto disimpan di cache memori server dan di browser (`Cache-Control: private, max-age=604800`), berkas `/assets/*` memakai ETag sehingga pindah halaman memakai balasan 304 yang cepat. Netlify: foto juga diberi cache browser.
+- Untuk percepatan lebih lanjut: pindahkan proyek Supabase ke region Singapura (`ap-southeast-1`); region tidak dapat diubah pada proyek yang sudah ada, jadi perlu proyek baru + pemindahan data.
+- Form edit aset: panel samping (Status penayangan, Masa sewa internal) tetap menempel dan dapat di-scroll sendiri bila lebih tinggi dari layar (`account.css`).

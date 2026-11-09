@@ -10,6 +10,14 @@ export function publicConfig() {
   return {name:e.BUSINESS_NAME || 'Sewa Aset Perhutani KPH Purwodadi', profile:e.BUSINESS_PROFILE || 'Katalog bangunan dan tanah kosong KPH Purwodadi.', areas:e.SERVICE_AREAS || 'KPH Purwodadi', hours:e.SERVICE_HOURS || 'Hubungi pengelola untuk jam layanan.', whatsapp:/^[1-9]\d{7,14}$/.test(number) ? number : null, whatsapp_display:e.WHATSAPP_DISPLAY || 'Nomor pengelola belum dikonfigurasi.', timezone:e.TIMEZONE || 'Asia/Jakarta'};
 }
 
+async function createBucket(base, key, bucket) {
+  const headers = {apikey:key, 'Content-Type':'application/json', ...(key.startsWith('eyJ') ? {Authorization:`Bearer ${key}`} : {})};
+  const result = await fetch(`${base}/storage/v1/bucket`, {method:'POST', headers, body:JSON.stringify({id:bucket, name:bucket, public:false}), signal:AbortSignal.timeout(15000)});
+  const text = await result.text().catch(() => '');
+  if (!result.ok && result.status !== 409 && !/already exists/i.test(text)) console.error('Supabase Storage: gagal membuat bucket', bucket, result.status, text.slice(0, 200));
+  return result.ok || result.status === 409 || /already exists/i.test(text);
+}
+
 export async function storage(method, bucket, filename, raw, type) {
   const base = process.env.SUPABASE_URL?.trim().replace(/\/$/, '');
   const key = storageKey();
@@ -19,9 +27,22 @@ export async function storage(method, bucket, filename, raw, type) {
   const path = filename.split('/').map(encodeURIComponent).join('/');
   const headers = {apikey:key, ...(key.startsWith('eyJ') ? {Authorization:`Bearer ${key}`} : {})};
   if (raw) headers['Content-Type'] = type;
-  const result = await fetch(`${base}/storage/v1/object/${bucket}/${path}`, {method, headers, body:raw, signal:AbortSignal.timeout(20000)});
-  check(result.status !== 404, 'Berkas tidak tersedia.', 404);
-  check(result.ok, 'Penyimpanan berkas sedang bermasalah. Coba lagi.', 502);
+  const send = () => fetch(`${base}/storage/v1/object/${bucket}/${path}`, {method, headers, body:raw, signal:AbortSignal.timeout(20000)});
+  let result = await send(), detail = '';
+  if (!result.ok) {
+    detail = await result.text().catch(() => '');
+    // Supabase membalas 400/404 "Bucket not found" bila bucket belum dibuat: buat otomatis lalu coba lagi sekali.
+    if (method === 'POST' && /bucket not found/i.test(detail) && await createBucket(base, key, bucket)) {
+      result = await send();
+      detail = result.ok ? '' : await result.text().catch(() => '');
+    }
+  }
+  if (!result.ok) {
+    console.error('Supabase Storage gagal:', method, bucket, result.status, detail.slice(0, 300));
+    check(!(method === 'GET' && (result.status === 404 || /not.?found/i.test(detail))), 'Berkas tidak tersedia.', 404);
+    check(![401, 403].includes(result.status), 'Key Supabase ditolak oleh Storage. Periksa SUPABASE_SECRET_KEY di Netlify (harus Secret key) lalu deploy ulang.', 503);
+    check(false, 'Penyimpanan berkas sedang bermasalah. Coba lagi.', 502);
+  }
   return method === 'GET' ? Buffer.from(await result.arrayBuffer()) : null;
 }
 
@@ -124,7 +145,7 @@ async function mainRoute(c) {
   if (match && method === 'GET') {
     const photo = await c.one('SELECT p.*,h.body FROM photos p JOIN houses h ON h.id=p.house_id WHERE p.id=$1',[match[1]]);
     check(photo && (['Tersedia','Dipesan'].includes(JSON.parse(photo.body).status) || await c.admin(false)), 'Foto tidak tersedia.',404);
-    return new Response(await storage('GET','asset-photos',photo.filename),{headers:{...responseHeaders,'Content-Type':contentType(photo.filename.split('.').pop())}});
+    return new Response(await storage('GET','asset-photos',photo.filename),{headers:{...responseHeaders,'Cache-Control':'private, max-age=604800','Content-Type':contentType(photo.filename.split('.').pop())}});
   }
   if (path.startsWith('/api/admin/houses')) {
     await c.admin();

@@ -7,6 +7,8 @@ diakses lewat indeks maupun nama kolom, sama seperti sqlite3.Row.
 import os
 import re
 import sqlite3
+import threading
+import time
 
 try:  # driver Postgres hanya dibutuhkan bila DATABASE_URL diisi
     import psycopg
@@ -81,12 +83,56 @@ class PgCursor:
         return iter(self.fetchall())
 
 
+# Membuka koneksi baru ke Supabase butuh beberapa kali bolak-balik jaringan (TCP, TLS, login), ratusan milidetik
+# per request. Koneksi yang sudah selesai dipakai disimpan sebentar dan dipakai ulang.
+POOL_MAX, POOL_IDLE, POOL_PING_AFTER = 6, 240, 10
+_pool, _pool_lock = [], threading.Lock()
+
+
+def _discard(connection):
+    try:
+        connection.close()
+    except Exception:  # pragma: no cover - koneksi sudah putus
+        pass
+
+
+def _take(dsn):
+    while True:
+        with _pool_lock:
+            index = next((i for i in range(len(_pool) - 1, -1, -1) if _pool[i][0] == dsn), None)
+            entry = _pool.pop(index) if index is not None else None
+        if entry is None:
+            return None
+        _, connection, since = entry
+        age = time.monotonic() - since
+        if getattr(connection, 'closed', False) or getattr(connection, 'broken', False) or age > POOL_IDLE:
+            _discard(connection)
+            continue
+        if age > POOL_PING_AFTER:  # koneksi lama diam: pastikan belum diputus server
+            try:
+                connection.cursor().execute('SELECT 1')
+                connection.rollback()
+            except Exception:
+                _discard(connection)
+                continue
+        return connection
+
+
+def _give(dsn, connection):
+    with _pool_lock:
+        if not getattr(connection, 'closed', False) and not getattr(connection, 'broken', False) and len(_pool) < POOL_MAX:
+            _pool.append((dsn, connection, time.monotonic()))
+            return
+    _discard(connection)
+
+
 class PgConnection:
     def __init__(self, dsn):
         if psycopg is None:
             raise RuntimeError('Paket psycopg belum terpasang. Jalankan: pip install "psycopg[binary]"')
+        self._dsn = dsn
         # prepare_threshold=None agar kompatibel dengan pooler Supabase (mode transaksi)
-        self._connection = psycopg.connect(dsn, prepare_threshold=None, connect_timeout=15)
+        self._connection = _take(dsn) or psycopg.connect(dsn, prepare_threshold=None, connect_timeout=15)
 
     def execute(self, sql, params=()):
         cursor = self._connection.cursor()
@@ -105,19 +151,29 @@ class PgConnection:
         self._connection.rollback()
 
     def close(self):
-        self._connection.close()
+        """Kembalikan koneksi ke kolam (perubahan yang belum di-commit dibatalkan)."""
+        connection, self._connection = self._connection, None
+        if connection is None:
+            return
+        try:
+            connection.rollback()
+        except Exception:
+            _discard(connection)
+            return
+        _give(self._dsn, connection)
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc, traceback):
         try:
-            if exc_type is None:
-                self._connection.commit()
-            else:
-                self._connection.rollback()
+            if self._connection is not None:
+                if exc_type is None:
+                    self._connection.commit()
+                else:
+                    self._connection.rollback()
         finally:
-            self._connection.close()
+            self.close()
         return False
 
 

@@ -73,7 +73,10 @@ Foto pertama menjadi foto utama. Tombol Kiri/Kanan mengurutkan; Jadikan utama me
 ```powershell
 python scripts/check.py
 python -m unittest discover -s tests -v
+node --test tests/convert.test.mjs tests/classify.test.cjs tests/xlsx-photos.test.cjs
 ```
+
+Sebagian tes lama (`test_app`, `test_tenant`, `test_supabase`) memerlukan `.env` tanpa `DATABASE_URL` atau paket `psycopg`. Tes `tests/netlify-api.test.mjs` memerlukan `npm install` (paket `pg`).
 
 Alias: `npm.cmd run build`, `npm.cmd run lint`, `npm.cmd test`. Aplikasi buildless: `build` memeriksa sintaks Python/JavaScript, JSON, dan whitespace; tidak menghasilkan bundle. Lint ini pemeriksaan ringan, bukan pemeriksaan tipe atau linter semantik penuh.
 
@@ -87,13 +90,56 @@ Alur penyewa: katalog -> **Jadwalkan Survei via WhatsApp** (wajib login/daftar, 
 - Halaman admin tambahan: `/admin/penyewa` (daftar penyewa dan verifikasi KTP, termasuk KTP yang diunggah sebelum ada pengajuan), `/admin/pengajuan` (daftar, filter, verifikasi KTP/surat, status, pembayaran, aktivasi sewa, perpanjangan) dan `/admin/impor` (impor Excel).
 - Berkas penyewa disimpan privat di `data/private/` dan hanya dapat diunduh lewat endpoint yang memeriksa pemilik atau admin. PDF/JPG/PNG maksimal 5 MB, setiap unggahan menjadi versi baru.
 - Dokumen Diterima/Terverifikasi tidak otomatis menyetujui pengajuan atau melunasi pembayaran; semuanya dicatat manual oleh admin.
-- Impor Excel: format Daftar Potensi Optimalisasi Aset (sheet `Purwodadi`). Baris menjadi Draft bertipe Bangunan (atau langsung Tersedia untuk yang belum tersewa bila opsi tayangkan dicentang) dengan kode `PWD-001`, ... Untuk bentuk kerja sama sewa 1 th, harga sewa tahunan (minimum 1 tahun) diisi dari Estimasi 2026 dan diberi catatan internal. Kolom Excel yang kosong (Objek/Lokasi/No. Inventaris) diberi catatan agar dilengkapi sebelum publikasi. Satu No. Inventaris boleh muncul di banyak baris. Impor ulang file yang sama tidak menggandakan data dan, bila opsi tayangkan dicentang, ikut menayangkan Draft hasil impor sebelumnya yang belum tersewa.
+- Impor Excel (format lama): format Daftar Potensi Optimalisasi Aset (sheet `Purwodadi`); untuk format lain pakai **Impor otomatis** (lihat "Pembaruan November 2026"). Baris menjadi Draft bertipe Bangunan (atau langsung Tersedia untuk yang belum tersewa bila opsi tayangkan dicentang) dengan kode `PWD-001`, ... Untuk bentuk kerja sama sewa 1 th, harga sewa tahunan (minimum 1 tahun) diisi dari Estimasi 2026 dan diberi catatan internal. Kolom Excel yang kosong (Objek/Lokasi/No. Inventaris) diberi catatan agar dilengkapi sebelum publikasi. Satu No. Inventaris boleh muncul di banyak baris. Impor ulang file yang sama tidak menggandakan data dan, bila opsi tayangkan dicentang, ikut menayangkan Draft hasil impor sebelumnya yang belum tersewa.
 - Data internal Perhutani (No. Inventaris, Alas Hak, Bentuk Kerja Sama, Real 2025, Estimasi 2026, Real 2026, Rencana 2027, Keterangan) hanya tampil di admin.
 - Tes tambahan: `python -m unittest tests.test_tenant -v`.
 
 Catatan: pada demo statis (Vercel/Netlify) halaman akun tetap berupa pratinjau desain (login demo, tanpa data nyata). Halaman fungsional hanya aktif saat memakai `python app.py serve`.
 
 Penyimpanan: SQLite dan folder `data/` secara bawaan, atau Supabase (lihat bagian Supabase di bawah).
+
+## Pembaruan November 2026
+
+Ringkasan fitur yang ditambahkan setelah PRD v0.3. Berlaku untuk server Python (`python app.py serve`); padanannya untuk Netlify ada di `server/*.mjs` (lihat [NETLIFY.md](NETLIFY.md)).
+
+### Impor otomatis (konversi Excel ke template)
+
+Admin > **Impor Excel** > "Impor otomatis". Excel dengan format apa pun dikonversi ke **template 15 kolom**: Nama Aset, Jenis Aset, Lokasi/Alamat, Deskripsi, Harga Sewa per Tahun, Minimum Lama Sewa, Luas Bangunan, Luas Tanah, Status Ketersediaan, Foto, Fasilitas, Kondisi Aset, Rekomendasi Peruntukan, Nomor Inventaris, Bentuk Kerja Sama. Template kosong: `public/assets/template-impor-aset.xlsx`.
+
+- Judul kolom dikenali dengan aturan (judul dua baris, sel gabungan, salah ketik ringan, baris penomoran 1, 2, 3 dilewati). Bila Excel punya banyak lembar, dipilih lembar yang judulnya paling cocok (atau isi kolom "Lembar kerja").
+- Kolom yang tidak dikenali aturan dipetakan model bahasa **bila `GROQ_API_KEY` diisi** (model bawaan `llama-3.3-70b-versatile`, ganti lewat `GROQ_MODEL`; API Groq kompatibel OpenAI). Bila Groq tidak diisi, `ANTHROPIC_API_KEY` dipakai sebagai cadangan (`ANTHROPIC_MODEL`). Yang dikirim hanya judul kolom yang tidak dikenali dan maksimal 3 contoh isi selnya (dipotong 80 karakter); isi data tidak diubah model. Tanpa key, kolom tak dikenal dilewati dan ditampilkan di pratinjau. Alamat dasar bisa diganti untuk pengujian (`GROQ_BASE_URL`, `ANTHROPIC_BASE_URL`).
+- Sel kosong dibiarkan kosong. Pratinjau menampilkan pemetaan kolom sebelum Impor; baris yang sudah pernah diimpor dilewati. Semua baris masuk **Draft** kecuali opsi tayangkan dicentang dan statusnya Tersedia.
+- **Foto di lembar lain** (gambar melayang, mis. lembar `1. argomulyo`) dibaca di browser, dicocokkan ke aset (angka = kolom No., isi kolom Foto, atau kemiripan nama; bisa diubah di pratinjau), dikecilkan (maks. 1600 px), lalu diunggah ke aset yang belum punya foto. Gambar "Place in Cell" belum didukung.
+- Kode: `importconv.py` (Python), `server/convert.mjs` + `server/importer.mjs` + `server/aimap.mjs` (Node), `public/assets/xlsx-photos.js` (browser). Tes: `tests/test_importconv.py`, `tests/test_aimap.py`, `tests/convert.test.mjs`, `tests/aimap.test.mjs`, `tests/xlsx-photos.test.cjs`.
+
+### Surat permohonan dan alur penyewa
+
+- Penyewa tidak bisa mengunggah surat bertanda tangan sebelum admin mengunggah **surat siap tanda tangan**. Halaman penyewa menjelaskan hal ini, punya tombol "Periksa pembaruan", dan menampilkan **Lihat surat** (tab baru) serta **Unduh** (gambar juga dipratinjau).
+- Daftar pengajuan admin menandai pengajuan yang butuh surat ("Surat belum disiapkan"). Setelah surat diunggah, tersedia tombol **Beri tahu penyewa via WhatsApp**.
+- Template surat: `public/assets/template-surat-permohonan.docx`. Tombol **Unduh surat terisi data penyewa (Word)** di detail pengajuan mengisi penanda `{{NAMA_PENYEWA}}`, `{{WHATSAPP}}`, `{{EMAIL}}`, `{{NAMA_ASET}}`, `{{KODE_ASET}}`, `{{ALAMAT_ASET}}`, `{{REF}}`, `{{TANGGAL}}`, `{{JENIS}}`, `{{JENIS_KECIL}}` langsung di browser. NIK, alamat, dan pekerjaan penyewa dibiarkan titik-titik (ditulis tangan). Ini template buatan sendiri; timpa dengan format resmi (penanda yang sama) bila ada.
+- Status **Selesai** otomatis ketika pelunasan dikonfirmasi; bila pelunasan dicabut, status kembali ke Disetujui.
+- Tabel pengajuan admin dilebarkan (halaman memakai lebar penuh) dan nama/email penyewa dipisah dua baris.
+
+### Katalog: pencarian, filter, urutan
+
+- Kotak **pencarian** (nama, kode, alamat, kecamatan, kategori, peruntukan; beberapa kata sekaligus).
+- Tiga filter: **Periode sewa** (bulanan/tahunan), **Jenis aset** (Rumah, Lahan, Gudang/TPK, Kantor/Gedung, Lainnya), dan **Kawasan** (kecamatan). Pilihan dibentuk dari data yang ada, jadi kecamatan atau jenis baru muncul sendiri. Kecamatan dibaca dari alamat ("Kec. X" / "Kecamatan X"); aset tanpa kecamatan tetap tampil di "Semua kawasan".
+- Jenis aset ditebak dari jenis dan nama; bisa diganti per aset lewat form admin ("Jenis aset untuk filter"). Logikanya di `public/assets/classify.js` (tes: `tests/classify.test.cjs`).
+- **Urutkan** selalu tersedia. Tanpa periode dipilih, harga dibandingkan sebagai harga per tahun (bulanan x 12).
+- Hero beranda selalu memakai gambar tetap di `public/assets/hero/` (`house-1.jpg` dst.), bukan foto aset.
+- Form edit aset: panel samping (Status penayangan, Masa sewa internal) menempel dan bisa di-scroll sendiri.
+
+### Performa
+
+Koneksi Postgres dipakai ulang lewat kolam kecil (`db.py`) karena membuka koneksi baru ke Supabase di setiap request lambat bila region database jauh (saat ini London; pindah ke Singapura `ap-southeast-1` akan jauh lebih cepat, tetapi perlu proyek Supabase baru). Foto di-cache di memori server dan browser (7 hari), dan `/assets/*` memakai ETag (balasan 304). Tes: `tests/test_dbpool.py`.
+
+### Keamanan
+
+`tests/test_security.py` (19 uji, `python -m unittest tests.test_security -v`) memeriksa: header (CSP, nosniff, X-Frame-Options, tanpa versi di header Server), cookie HttpOnly/SameSite, tanpa CORS asing, semua endpoint admin/penyewa menolak tanpa login, CSRF wajib, permintaan lintas asal ditolak, sesi mati saat logout, tidak ada eskalasi lewat mass assignment, IDOR antar penyewa, foto Draft tidak publik, path traversal (kode sumber, `.env`, database tidak bocor), SQL injection, pesan error tanpa jejak internal, unggahan menyamar (HTML/SVG/EXE/PHP) ditolak, isi permintaan raksasa ditolak, dan pembatasan login. Pelengkap manual: XSS di browser (data berisi skrip tidak dieksekusi di halaman publik/admin/penyewa).
+
+### Cadangan data
+
+Lihat "Cadangan terjadwal (inkremental)" di bawah untuk `backup-auto` (harian, hanya data baru) dan `backup-data` (salinan penuh sekali jalan). Tes: `tests/test_backup.py`, `tests/test_backup_auto.py`.
 
 ## Pengujian otomatis (Vitest + Playwright)
 
@@ -124,7 +170,48 @@ Langkah setup (dari komputer lokal):
 
 Catatan keamanan: pada Postgres, aplikasi mengaktifkan Row Level Security tanpa kebijakan pada semua tabelnya, sehingga anon key Supabase tidak dapat membaca data lewat REST API. Hanya backend (peran pemilik tabel) yang mengakses data. `python app.py db-check` memverifikasi hal ini.
 
-Cadangan: untuk mode Supabase gunakan Database > Backups di dashboard Supabase (perintah `backup` hanya untuk SQLite lokal). Berkas di Storage tidak ikut cadangan database dan perlu diekspor terpisah.
+Cadangan data lengkap (database + foto + KTP + surat), mode Supabase maupun SQLite:
+
+```powershell
+python app.py backup-data --zip
+```
+
+Hasilnya folder `backups/cadangan-TANGGAL-JAM` (dan `.zip` bila memakai `--zip`) berisi semua tabel (`database/*.jsonl`), semua berkas (`files/`), `MANIFEST.json` berisi checksum SHA-256, dan `CARA-PEMULIHAN.txt`. Sesi login tidak ikut. Berkas `.env` tidak ikut: simpan terpisah. Cadangan memuat hash kata sandi, jadi simpan di tempat privat. Pulihkan ke database **kosong** (proyek Supabase baru atau folder data baru):
+
+```powershell
+python app.py restore-data --input backups/cadangan-TANGGAL-JAM
+python app.py restore-data --input backups/cadangan-TANGGAL-JAM --files-only   # bila hanya unggah berkas yang gagal
+```
+
+### Cadangan terjadwal (inkremental)
+
+`backup-data` menyalin semuanya setiap kali dijalankan. Untuk jadwal harian pakai `backup-auto`: **hanya data baru atau yang berubah yang disimpan**.
+
+```powershell
+python app.py backup-auto             # simpan ke backups/auto (atau --store D:\CadanganSewaAset)
+python app.py backup-list             # daftar snapshot
+python app.py backup-verify           # periksa checksum semua snapshot
+python app.py restore-data --input backups/auto                      # pulihkan snapshot terbaru
+python app.py restore-data --input backups/auto --snapshot ID        # pulihkan snapshot tertentu
+```
+
+- Foto/KTP/surat yang sudah tersimpan **tidak diunduh dan tidak disimpan lagi** (nama berkasnya unik dan tidak pernah berubah).
+- Tabel disimpan sekali per isi yang berbeda; tabel yang tidak berubah dipakai ulang oleh snapshot berikutnya.
+- Bila tidak ada perubahan sama sekali sejak snapshot terakhir, tidak ada snapshot baru yang dibuat.
+- Setiap snapshot adalah titik pemulihan penuh. Snapshot terbaru `--keep` (bawaan 30) disimpan; yang lebih lama dihapus beserta data yang tak dipakai lagi.
+- Dua backup tidak bisa berjalan bersamaan (berkas `LOCK`). Snapshot baru baru muncul setelah semua datanya tersimpan utuh.
+
+Pasang jadwal harian di Windows (sekali saja, dari folder proyek):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\pasang-jadwal-backup.ps1 -Jam 02:00
+Start-ScheduledTask -TaskName BackupSewaAset     # uji sekarang
+Get-Content backups\backup.log -Tail 20          # lihat hasilnya
+```
+
+Komputer harus menyala (bila mati pada jam itu, backup dijalankan begitu menyala lagi). Untuk salinan di luar komputer, arahkan `--store` ke folder yang disinkronkan (Google Drive/OneDrive) dengan mengubah `scripts\backup-harian.bat`. Di Linux/macOS: `0 2 * * * cd /path/proyek && python3 app.py backup-auto >> backups/backup.log 2>&1`.
+
+Pemulihan memeriksa checksum lebih dulu dan menolak tujuan yang sudah berisi data. Sebagai lapisan tambahan, Database > Backups di dashboard Supabase tetap bisa dipakai (berkas Storage tidak ikut di sana).
 
 ### Hosting backend (contoh Render)
 
@@ -143,6 +230,8 @@ Perintah menolak folder tujuan yang sudah ada dan folder dalam direktori data. U
 ## Batasan sebelum produksi
 
 Ini aplikasi lokal yang dapat dijalankan, bukan klaim siap produksi. Server HTTP bawaan Python ditujukan untuk penggunaan lokal. Peluncuran publik memerlukan server/reverse proxy production, HTTPS, pembatasan unggahan dan request di proxy, konfigurasi host, pemantauan, pencadangan terjadwal dan uji pemulihan, serta peninjauan keamanan. Pembatasan login saat ini di memori proses (10 percobaan/15 menit/IP), sesi bertahan 8 jam, kata sandi di-hash scrypt. Akses tulis membutuhkan sesi dan token CSRF; data internal dikeluarkan dari respons publik. Tidak ada reset kata sandi via email di versi awal.
+
+Keamanan yang masih perlu diperhatikan: akun admin tunggal tanpa 2FA; pembatasan login hanya di memori dan per IP; `.env` tidak boleh dibagikan atau di-commit (ganti kunci Supabase bila pernah terbagikan); uji keamanan otomatis hanya mencakup server Python (belum Netlify/Node) dan belum ada pemindai seperti OWASP ZAP atau audit dependensi.
 
 Foto diperiksa melalui signature dan ukuran, tanpa re-encoding/optimisasi otomatis atau pemindaian file. Foto besar sebaiknya dioptimalkan sebelum unggah. Identitas usaha, nomor kontak, rumah/foto/alamat sebenarnya belum tersedia. Tidak ada pembayaran online maupun integrasi WhatsApp API.
 

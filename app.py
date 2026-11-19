@@ -269,6 +269,7 @@ def validate_house(body, previous=None, photo_count=0):
 
 class Handler(BaseHTTPRequestHandler):
     server_version = 'Sewa Aset Perhutani KPH Purwodadi'
+    sys_version = ''  # jangan bocorkan versi Python di header Server
 
     def log_message(self, fmt, *args):
         # Avoid logging credentials and URL query strings.
@@ -555,10 +556,16 @@ def db_check():
 
 def main():
     parser = argparse.ArgumentParser(description='Website penyewaan rumah lokal')
-    parser.add_argument('command', choices=['serve', 'init', 'create-admin', 'seed-demo', 'backup', 'db-check'], nargs='?', default='serve')
+    parser.add_argument('command', choices=['serve', 'init', 'create-admin', 'seed-demo', 'backup', 'backup-data', 'backup-auto', 'backup-list', 'backup-verify', 'restore-data', 'db-check'], nargs='?', default='serve')
     parser.add_argument('--port', type=int, default=int(os.environ.get('PORT', 8000)))
     parser.add_argument('--host', default=os.environ.get('HOST', '127.0.0.1'))
     parser.add_argument('--output', help='Folder cadangan baru')
+    parser.add_argument('--input', help='restore-data: folder, .zip, atau penyimpanan backup-auto')
+    parser.add_argument('--zip', action='store_true', help='backup-data: buat juga berkas .zip')
+    parser.add_argument('--files-only', action='store_true', help='restore-data: hanya unggah ulang berkas')
+    parser.add_argument('--store', help='backup-auto/list/verify: folder penyimpanan cadangan inkremental (bawaan: backups/auto)')
+    parser.add_argument('--keep', type=int, default=30, help='backup-auto: jumlah snapshot terbaru yang disimpan (0 = semua)')
+    parser.add_argument('--snapshot', help='restore-data: id snapshot (bawaan: terbaru)')
     parser.add_argument('--append', action='store_true', help='seed-demo: tambahkan contoh tanpa menghapus data yang ada')
     args = parser.parse_args()
     init_db()
@@ -580,11 +587,40 @@ def main():
         seed_demo(args.append)
     elif args.command == 'db-check':
         db_check()
+    elif args.command == 'backup-data':
+        import backup as backups
+        result = backups.backup(sys.modules[__name__], args.output, args.zip)
+        print(f"Cadangan selesai: {result['tables']} tabel, {result['rows']} baris, {result['files']} berkas -> {result['folder']}")
+        if result.get('zip'):
+            print(f"Arsip zip: {result['zip']}")
+        if result['missing']:
+            print(f"PERINGATAN: {result['missing']} berkas tercatat di database tetapi tidak ditemukan di penyimpanan (lihat MANIFEST.json).")
+    elif args.command == 'backup-auto':
+        import backup as backups
+        backups.auto_backup(sys.modules[__name__], args.store, args.keep)
+    elif args.command == 'backup-list':
+        import backup as backups
+        snapshots = backups.list_snapshots(args.store)
+        for item in snapshots:
+            print(f"{item['id']}  {item['dibuat']}  {item['rows']} baris  {item['files']} berkas" + (f"  ({item['missing']} berkas hilang)" if item['missing'] else ''))
+        print(f'{len(snapshots)} snapshot.')
+    elif args.command == 'backup-verify':
+        import backup as backups
+        problems = backups.verify_store(args.store)
+        if problems:
+            raise SystemExit('Ditemukan masalah:\n  ' + '\n  '.join(problems[:20]))
+        print('Semua snapshot utuh.')
+    elif args.command == 'restore-data':
+        import backup as backups
+        if not args.input:
+            raise SystemExit('Gunakan --input dengan folder, .zip, atau penyimpanan backup-auto.')
+        result = backups.restore(sys.modules[__name__], args.input, args.files_only, snapshot=args.snapshot)
+        print(f"Pemulihan selesai: {result['tables']} tabel, {result['rows']} baris, {result['files']} berkas. Semua pengguna perlu login ulang.")
     elif args.command == 'backup':
         if not args.output:
             raise SystemExit('Gunakan --output dengan folder cadangan baru. Hentikan server terlebih dahulu.')
         if database.using_postgres():
-            raise SystemExit('Database ada di Supabase: gunakan Database > Backups di dashboard Supabase. Perintah ini hanya untuk mode SQLite lokal.')
+            raise SystemExit('Database ada di Supabase: gunakan `python app.py backup-data` (database + foto + dokumen), atau Database > Backups di dashboard Supabase.')
         destination = Path(args.output).resolve()
         if destination.exists() or destination.is_relative_to(DATA):
             raise SystemExit('Gunakan folder baru di luar direktori data.')

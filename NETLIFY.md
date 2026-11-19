@@ -107,7 +107,7 @@ WHERE kind <> 'survei' AND payment='lunas' AND status='disetujui';
 
 ## Impor otomatis (konversi ke template)
 
-Halaman Admin > Impor Excel punya bagian **Impor otomatis**. Format Excel bebas: judul kolom dikenali dengan aturan (termasuk judul dua baris dan salah ketik ringan); kolom yang tidak dikenal dipetakan oleh Claude API bila variabel **ANTHROPIC_API_KEY** diisi di Netlify (opsional: ANTHROPIC_MODEL, default claude-sonnet-4-6). Tanpa key, kolom tak dikenal dilewati. AI hanya memetakan judul kolom; isi data tidak pernah diubah oleh AI. Template: `public/assets/template-impor-aset.xlsx`. Foto belum diimpor otomatis.
+Halaman Admin > Impor Excel punya bagian **Impor otomatis**. Format Excel bebas: judul kolom dikenali dengan aturan (termasuk judul dua baris dan salah ketik ringan); kolom yang tidak dikenal dipetakan model bahasa bila variabel **GROQ_API_KEY** diisi di Netlify (opsional: GROQ_MODEL, default llama-3.3-70b-versatile); bila tidak ada, **ANTHROPIC_API_KEY** dipakai sebagai cadangan (opsional ANTHROPIC_MODEL). Tanpa key, kolom tak dikenal dilewati. AI hanya memetakan judul kolom; isi data tidak pernah diubah oleh AI. Template: `public/assets/template-impor-aset.xlsx`. Foto belum diimpor otomatis.
 
 ### Foto dan filter katalog
 

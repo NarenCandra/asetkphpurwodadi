@@ -18,11 +18,11 @@ h1, h2, h3 { font-weight: 500; }
 .header-inner { min-height: 88px; width: 100%; max-width: none; margin: 0; padding-inline: 32px; justify-content: space-between; }
 .brand { font-size: 1.35rem; font-weight: 650; letter-spacing: -.055em; }
 .brand-icon { background: var(--sage); color: var(--green-dark); width: 40px; height: 42px; border-radius: 50% 50% 9px 9px; }
-.nav a { font-size: .88rem; border-radius: 24px; padding-inline: 20px; }
+.nav a { font-size: .88rem; border-radius: 6px; padding-inline: 20px; }
 .nav a[aria-current='page'] { background: var(--sage); color: var(--green-dark); }
 .nav a[href='/tentang'] { border: 1px solid #b8c9b0; margin-left: 12px; }
-.btn { border-radius: 25px; padding-inline: 25px; }
-.btn.small { border-radius: 8px; }
+.btn { border-radius: 6px; padding-inline: 25px; }
+.btn.small { border-radius: 6px; }
 .btn.secondary { background: var(--accent); border-color: #d3dfc4; color: var(--green-dark); }
 .btn.secondary:hover { background: #d4e3bc; }
 .hero {
@@ -66,7 +66,7 @@ h1, h2, h3 { font-weight: 500; }
 .card-code { font-size: .72rem; }
 .card-specs { font-size: .76rem; gap: 15px; margin: 16px 0; padding-bottom: 16px; }
 .price { font-size: 1.25rem; font-weight: 650; letter-spacing: -.04em; }
-.card-bottom > a { border-radius: 20px; font-size: .74rem; padding: 10px 13px; background: var(--accent); border-color: #d8e4ca; color: var(--green-dark); }
+.card-bottom > a { border-radius: 6px; font-size: .74rem; padding: 10px 13px; background: var(--accent); border-color: #d8e4ca; color: var(--green-dark); }
 .site-footer { background: var(--green-dark); color: #f2f6ed; border-top: 1px solid var(--green-dark); padding-block: 43px; }
 .site-footer .brand { font-size: 1.25rem; }
 .site-footer .brand-icon { background: white; color: var(--green); }
@@ -116,7 +116,7 @@ h1, h2, h3 { font-weight: 500; }
   .header-inner { min-height: 72px; padding-inline: 20px; }
   .brand { font-size: 1.25rem; }
   .brand-icon { width: 34px; height: 37px; }
-  .menu-toggle { border-radius: 22px; background: white; }
+  .menu-toggle { border-radius: 6px; background: white; }
   .nav { background: white; }
   .nav a, .nav a[href='/tentang'] { margin: 0; border: 0; border-radius: 7px; }
   .hero { grid-template-columns: 1fr; gap: 25px; margin-top: 26px; width: calc(100% - 40px); }
@@ -138,7 +138,7 @@ h1, h2, h3 { font-weight: 500; }
   .section { padding-top: 32px; padding-bottom: 40px; }
   .section-heading h2 { font-size: 1.55rem; }
   .section-heading p { font-size: .83rem; }
-  .section-heading .btn { border-radius: 22px; }
+  .section-heading .btn { border-radius: 6px; }
   .house-card { border-radius: 14px; padding: 0; }
   .card-photo { aspect-ratio: 1.5; border-radius: 0; }
   .card-body { padding: 19px 18px; }

@@ -193,7 +193,7 @@ function shell(content, title='Sewa aset') {
   const onFocus = event => {
     if (!nav.contains(event.target) && !toggle.contains(event.target)) setMenu(false);
   };
-  const desktop = matchMedia('(min-width: 721px)');
+  const desktop = matchMedia('(min-width: 901px)');
   const onResize = () => setMenu(false);
   const header = $('.site-header');
   const onScroll = () => {
